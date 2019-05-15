@@ -1,0 +1,5 @@
+Todo:
+- Create package structure
+- Use real dataset
+- Adjust length of discriminator (return max(length, 1))/discriminator.matching()?
+- Use Offline Processing?
