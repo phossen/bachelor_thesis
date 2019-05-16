@@ -22,6 +22,8 @@ class WiSARD():
         The shape of the dataset has to be:
         (data, time)
         """
+        amount_discs= []
+        
         for x, t in dataset:
             # Delete outdated information
             self.delete_old_information(t)
@@ -49,6 +51,10 @@ class WiSARD():
             # Learn the current x
             for a, j in zip(self.addressing(x), range(self.delta)):
                 self.discriminators[k].neurons[j].addresses[tuple(a)] = t
+
+            amount_discs.append(len(self.discriminators))
+
+        return amount_discs
 
     def delete_old_information(self, t):
         """
