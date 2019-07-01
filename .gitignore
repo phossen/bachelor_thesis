@@ -5,6 +5,8 @@ __pycache__/
 
 # IDE
 .vscode/
+wisard/__pycache__/
+.idea/
 
 # C extensions
 *.so

@@ -1,87 +1,137 @@
+from .discriminators import *
+from .neurons import *
+import random
 import numpy as np
-from collections import defaultdict
-from discriminator import Discriminator
 
 
-class WiSARD():
-    def __init__(self, omega, delta, beta, gamma, epsilon, µ=0):
+class WiSARD(object):
+    """
+    The superclass of all WiSARD-like classifiers.
+
+    This should be used as a template to any implementation, as an
+    abstract class, but no method is indeed required to be overriden.
+    """
+
+    def __init__(self):
         """
-        This class implements a WiSARD classifier.
+        Initializes the classifier.
         """
-        self.omega = omega  # When information is outdated
-        self.delta = delta  # Number of neurons in discriminators
-        self.beta = beta  # Length of the addresses
-        self.gamma = gamma  # Controls encoding resolution
-        self.epsilon = epsilon  # Threshold for creating new discriminator
-        self.µ = µ  # Cardinality weight
+        raise NotImplementedError('This class is abstract. Derive it.')
+
+    def __len__(self):
+        """
+        Returns the number of discriminators in the classifier.
+        """
+        raise NotImplementedError('This method is abstract. Override it.')
+
+    def clear(self):
+        """
+        Clears the discriminators.
+        """
+        raise NotImplementedError('This method is abstract. Override it.')
+
+    def record(self, observation, class_):
+        """
+        Record the provided observation, relating it to the given class.
+        """
+        raise NotImplementedError('This method is abstract. Override it.')
+
+    def save(self, path):
+        """
+        Saves the classifier.
+        """
+        raise NotImplementedError('This method is abstract. Override it.')
+
+    def load(self, path):
+        """
+        Loads the classifier.
+        """
+        raise NotImplementedError('This method is abstract. Override it.')
+
+
+class WCDS(WiSARD):
+    """
+    This class implements WCDS, 
+    a stream clusterer based on WiSARD.
+    """
+
+    def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0, discriminator_factory=SWDiscriminator, mapping="random", seed=123456):
+        """
+        Constructor for the WCDS stream clusterer.
+
+        Parameters
+        ----------
+            omega : Defines temporal sliding window length
+            delta : Number of neurons in discriminators
+            gamma : Controls encoding resolution
+            epsilon : Threshold for creating new discriminator
+            dimension : Dimension of the incoming instances
+            µ : Cardinality weight to tackle cluster imbalance
+            discriminator_factory : Callable to create Discriminators
+            mapping : Maptype used in addressing, either "linear" or "random"
+            seed : Used to make results replicable in random mapping
+        """
+        self.omega = omega
+        self.delta = delta
+        self.beta = gamma*dimension/delta # Length of the addresses
+        self.gamma = gamma
+        self.epsilon = epsilon
+        self.µ = µ
+        self.dimension = dimension
+        self.mapping = mapping
+        self.seed = seed
+        self.discriminator_factory = discriminator_factory
         self.discriminators = []
 
-    def classify(self, dataset):
+    def __len__(self):
+        return len(self.discriminators)
+
+    def record(self, observation, time, verbose=0):
         """
-        Classifies the given dataset.
-        The shape of the dataset has to be:
-        (data, time)
+        Absorbs observation and time.
         """
-        amount_discs= []
-        
-        for x, t in dataset:
-            # Delete outdated information
-            self.delete_old_information(t)
+        # Delete outdated information
+        self.bleach(time - self.omega)
 
-            # Delete useless discriminators
-            self.clean_discriminators()
+        # Delete useless discriminators
+        self.clean_discriminators()
 
-            # Check if there is at least one discriminator
-            if len(self.discriminators) > 0:
-                # Choose best discriminator
-                k = np.argmax([d.matching(self.addressing(x), self.µ)
-                               for d in self.discriminators])
+        # Calculate addressing of the observation
+        addressing = self.addressing(observation)
 
-                # If matching is too small create new discriminator
-                if self.discriminators[k].matching(
-                        self.addressing(x), self.µ) < self.epsilon:
-                    d = Discriminator(self.delta)
-                    self.discriminators.append(d)
-                    k = len(self.discriminators) - 1
-            else:
-                d = Discriminator(self.delta)
+        # Check if there is at least one discriminator
+        if len(self.discriminators) > 0:
+            # Choose index of best discriminator
+            k = np.argmax([d.matching(addressing, self.µ) for d in self.discriminators])
+
+            # If matching is too small create new discriminator
+            if self.discriminators[k].matching(addressing, self.µ) < self.epsilon:
+                d = self.discriminator_factory(self.delta)
                 self.discriminators.append(d)
                 k = len(self.discriminators) - 1
+        else:
+            d = self.discriminator_factory(self.delta)
+            self.discriminators.append(d)
+            k = len(self.discriminators) - 1
 
-            # Learn the current x
-            for a, j in zip(self.addressing(x), range(self.delta)):
-                self.discriminators[k].neurons[j].addresses[tuple(a)] = t
+        # Learn the current observation
+        self.discriminators[k].record(addressing, time)
 
-            amount_discs.append(len(self.discriminators))
+    def predict(self, observation):
+        """
+        Predicts index of best discriminator and returns the confidence.
+        """
+        addressing = self.addressing(observation)
+        k = np.argmax([d.matching(addressing, self.µ) for d in self.discriminators])
+        return k, self.discriminators[k].matching(addressing, self.µ)
 
-        return amount_discs
-
-    def delete_old_information(self, t):
+    def bleach(self, threshold):
         """
         Deletes the addresses in the discriminator neurons
-        that are outdated with respect to omega and t.
+        that are outdated with respect to the given threshold.
         """
-        d_indices, n_indices, addresses = self._get_old_information(t)
-        for d, n, address in zip(d_indices, n_indices, addresses):
-            del self.discriminators[d].neurons[n].addresses[address]
-
-    def _get_old_information(self, t):
-        """
-        Returns three lists of the indices of discriminators
-        and neurons and the addresses that are outdated with
-        respect to omega and t.
-        """
-        d_indices, n_indices, addresses = [], [], []
-        for d in range(len(self.discriminators)):
-            for n in range(self.delta):
-                for address in self.discriminators[d].neurons[n].addresses.keys(
-                ):
-                    if self.discriminators[d].neurons[n].addresses[address] < t - self.omega:
-                        d_indices.append(d)
-                        n_indices.append(n)
-                        addresses.append(address)
-
-        return d_indices, n_indices, addresses
+        for d in self.discriminators:
+            d.bleach(threshold)
 
     def clean_discriminators(self):
         """
@@ -91,22 +141,36 @@ class WiSARD():
             if not d.is_useful():
                 del d
 
-    def addressing(self, x):
+    def addressing(self, observation):
         """
         Calculate and return the
-        addressing for a given x.
+        addressing for a given observation.
         """
-        address = [self._binarize(x_i) for x_i in x]
-        return np.reshape(address, (self.delta, self.beta))
+        binarization = [self._binarize(x_i, self.gamma) for x_i in observation]
 
-    def _binarize(self, x):
+        if self.mapping == "linear":
+            return np.reshape(binarization, (self.delta, self.beta))
+        elif self.mapping == "random":
+            mapping = range(self.dimension*self.gamma)
+            random.seed(self.seed)
+            random.shuffle(mapping)
+            linear_binarization = np.reshape(binarization, self.dimension*self.gamma)
+            linear_addressing = [linear_binarization[i] for i in mapping]
+            return np.reshape(linear_addressing, (self.delta, self.beta))
+        else:
+            raise KeyError("Mapping has an invalid value!")
+
+    def _binarize(self, x, resolution):
         """
-        Binarize given x.
+        Binarize given x using thermometer binarization.
         """
         b = tuple()
-        for i in range(self.gamma):
-            if x * self.gamma >= i:
+        for i in range(resolution):
+            if x * resolution >= i:
                 b += (1,)
             else:
                 b += (0,)
         return b
+        
+    def clear(self):
+        self.discriminators.clear()
