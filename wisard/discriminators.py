@@ -185,9 +185,6 @@ class SWDiscriminator(Discriminator):
         The higher µ, the more precise discriminators
         are used.
         """
-        if self.__len__() == 0:
-            return 0
-
         match = 0
         for i in range(self.no_neurons):
             if self.neurons[i].is_set(observation[i]):
