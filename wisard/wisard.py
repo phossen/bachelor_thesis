@@ -16,46 +16,56 @@ class WiSARD(object):
         """
         Initializes the classifier.
         """
-        raise NotImplementedError('This class is abstract. Derive it.')
+        raise NotImplementedError("This class is abstract. Derive it.")
 
     def __len__(self):
         """
         Returns the number of discriminators in the classifier.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def clear(self):
         """
         Clears the discriminators.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def record(self, observation, class_):
         """
         Record the provided observation, relating it to the given class.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def save(self, path):
         """
         Saves the classifier.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def load(self, path):
         """
         Loads the classifier.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
 
 class WCDS(WiSARD):
     """
-    This class implements WCDS, 
+    This class implements WCDS,
     a stream clusterer based on WiSARD.
     """
 
-    def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0, discriminator_factory=SWDiscriminator, mapping="random", seed=123456):
+    def __init__(
+            self,
+            omega,
+            delta,
+            gamma,
+            epsilon,
+            dimension,
+            µ=0,
+            discriminator_factory=SWDiscriminator,
+            mapping="random",
+            seed=1234):
         """
         Constructor for the WCDS stream clusterer.
 
@@ -73,8 +83,17 @@ class WCDS(WiSARD):
         """
         self.omega = omega
         self.delta = delta
-        self.beta = gamma*dimension/delta # Length of the addresses
         self.gamma = gamma
+        self.beta = int(
+            gamma *
+            dimension /
+            delta) if (
+            gamma *
+            dimension /
+            delta).is_integer() else self._adjust_gamma(
+            gamma,
+            dimension,
+            delta)  # Length of the addresses
         self.epsilon = epsilon
         self.µ = µ
         self.dimension = dimension
@@ -85,6 +104,19 @@ class WCDS(WiSARD):
 
     def __len__(self):
         return len(self.discriminators)
+
+    def _adjust_gamma(self, gamma, dimension, delta):
+        """
+        The parameters have to fulfill the property:
+        beta = (gamma * dimension) / delta
+        This function is called if this is not the case
+        and adjusts gamma automatically and returns new
+        beta.
+        """
+        beta = int(round(gamma * dimension / delta))
+        self.gamma = int((beta * delta) / dimension)
+        print("WARNING! Adjusted gamma to the clusterers needs: ", self.gamma)
+        return beta
 
     def record(self, observation, time, verbose=0):
         """
@@ -102,10 +134,12 @@ class WCDS(WiSARD):
         # Check if there is at least one discriminator
         if len(self.discriminators) > 0:
             # Choose index of best discriminator
-            k = np.argmax([d.matching(addressing, self.µ) for d in self.discriminators])
+            k = np.argmax([d.matching(addressing, self.µ)
+                           for d in self.discriminators])
 
             # If matching is too small create new discriminator
-            if self.discriminators[k].matching(addressing, self.µ) < self.epsilon:
+            if self.discriminators[k].matching(
+                    addressing, self.µ) < self.epsilon:
                 d = self.discriminator_factory(self.delta)
                 self.discriminators.append(d)
                 k = len(self.discriminators) - 1
@@ -122,7 +156,8 @@ class WCDS(WiSARD):
         Predicts index of best discriminator and returns the confidence.
         """
         addressing = self.addressing(observation)
-        k = np.argmax([d.matching(addressing, self.µ) for d in self.discriminators])
+        k = np.argmax([d.matching(addressing, self.µ)
+                       for d in self.discriminators])
         return k, self.discriminators[k].matching(addressing, self.µ)
 
     def bleach(self, threshold):
@@ -146,17 +181,28 @@ class WCDS(WiSARD):
         Calculate and return the
         addressing for a given observation.
         """
-        binarization = [self._binarize(x_i, self.gamma) for x_i in observation]
+        binarization = np.array(
+            [self._binarize(x_i, self.gamma) for x_i in observation])
 
         if self.mapping == "linear":
             return np.reshape(binarization, (self.delta, self.beta))
         elif self.mapping == "random":
-            mapping = range(self.dimension*self.gamma)
+            # Create mapping
+            mapping = list(range(self.dimension * self.gamma))
             random.seed(self.seed)
             random.shuffle(mapping)
-            linear_binarization = np.reshape(binarization, self.dimension*self.gamma)
-            linear_addressing = [linear_binarization[i] for i in mapping]
-            return np.reshape(linear_addressing, (self.delta, self.beta))
+            # Apply mapping
+            linear_binarization = np.reshape(
+                binarization, self.dimension * self.gamma)
+            linear_addressing = np.array(
+                [linear_binarization[i] for i in mapping])
+            np.reshape(linear_addressing, (self.delta, self.beta))
+            # Cast to tuple to allow it to be dict key
+            tuple_addressing = [
+                tuple(
+                    (linear_addressing[i],)) for i in range(
+                    len(linear_addressing))]
+            return tuple_addressing
         else:
             raise KeyError("Mapping has an invalid value!")
 
@@ -171,6 +217,6 @@ class WCDS(WiSARD):
             else:
                 b += (0,)
         return b
-        
+
     def clear(self):
         self.discriminators.clear()

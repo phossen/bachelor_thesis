@@ -15,14 +15,14 @@ class Discriminator(object):
         """
         self.neuron_factory = neuron_factory
         self.no_neurons = no_neurons
-        self.neurons = [self.neuron_factory() for _ in self.no_neurons]
+        self.neurons = [self.neuron_factory() for _ in range(self.no_neurons)]
 
     def __len__(self):
         """
         Returns the length of the discriminator.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
-    
+        raise NotImplementedError("This method is abstract. Override it.")
+
     def record(self, observation):
         """
         Record the provided observation.
@@ -30,13 +30,13 @@ class Discriminator(object):
         The observation is expected to be a list of addresses, each of which
         will be recorded by its respective neuron.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def bleach(self, threshold):
         """
         Bleach the discriminator by bleaching each of its neurons.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def clear(self):
         """
@@ -49,14 +49,14 @@ class Discriminator(object):
         """
         Calculate the matching between an observation and this discriminator.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def intersection_level(self, dscrmntr):
         """
         Returns the intersection level between this
         and the given discriminator.
         """
-        raise NotImplementedError('This class is abstract. Derive it.')
+        raise NotImplementedError("This class is abstract. Derive it.")
 
 
 class HitDiscriminator(Discriminator):
@@ -65,7 +65,7 @@ class HitDiscriminator(Discriminator):
     """
 
     def __init__(self, no_neurons, neuron_factory=SetNeuron):
-        super.__init__(no_neurons, neuron_factory)
+        super().__init__(no_neurons, neuron_factory)
 
     def __len__(self):
         """
@@ -91,15 +91,18 @@ class HitDiscriminator(Discriminator):
         by the number of neurons.
         """
         if relative:
-            return float(sum(neuron.is_set(address) for address, neuron in zip(observation, self.neurons)))/self.no_neurons
-        return sum(neuron.is_set(address) for address, neuron in zip(observation, self.neurons))
+            return float(sum(neuron.is_set(address) for address, neuron in zip(
+                observation, self.neurons))) / self.no_neurons
+        return sum(neuron.is_set(address)
+                   for address, neuron in zip(observation, self.neurons))
 
     def intersection_level(self, dscrmntr):
         """
         The intersection between two discriminators is defined as
         the mean intersection of its neurons.
         """
-        return np.mean([na.intersection_level(nb) for na, nb in zip(self.neurons, dscrmntr.neurons)])
+        return np.mean([na.intersection_level(nb)
+                        for na, nb in zip(self.neurons, dscrmntr.neurons)])
 
 
 class FrequencyDiscriminator(Discriminator):
@@ -109,7 +112,7 @@ class FrequencyDiscriminator(Discriminator):
     """
 
     def __init__(self, no_neurons, neuron_factory=DictNeuron):
-        super.__init__(no_neurons, neuron_factory)
+        super().__init__(no_neurons, neuron_factory)
 
     def __len__(self):
         """
@@ -127,7 +130,7 @@ class FrequencyDiscriminator(Discriminator):
             n.bleach()
 
     def matching(self, observation, relative=True):
-        inv_total = 1./self.no_neurons if relative else 1
+        inv_total = 1. / self.no_neurons if relative else 1
         match = 0
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
@@ -140,7 +143,8 @@ class FrequencyDiscriminator(Discriminator):
         The intersection between two discriminators is defined as
         the mean intersection of its neurons.
         """
-        return np.mean([na.intersection_level(nb) for na, nb in zip(self.neurons, dscrmntr.neurons)])
+        return np.mean([na.intersection_level(nb)
+                        for na, nb in zip(self.neurons, dscrmntr.neurons)])
 
 
 class SWDiscriminator(Discriminator):
@@ -149,7 +153,7 @@ class SWDiscriminator(Discriminator):
     """
 
     def __init__(self, no_neurons, neuron_factory=SWNeuron):
-        super.__init__(no_neurons, neuron_factory)
+        super().__init__(no_neurons, neuron_factory)
 
     def __len__(self):
         """
@@ -186,10 +190,11 @@ class SWDiscriminator(Discriminator):
 
         match = 0
         for i in range(self.no_neurons):
-            if self.neurons.is_set(observation[i]):
+            if self.neurons[i].is_set(observation[i]):
                 match += 1
 
-        return ((1 / self.no_neurons) * match) / ((self.__len__())**(µ / self.no_neurons))
+        return ((1 / self.no_neurons) * match) / \
+            ((self.__len__())**(µ / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
@@ -205,7 +210,7 @@ class SWDiscriminator(Discriminator):
             d_intersection += len(set(self.neurons[i].addresses.keys()).intersection(
                 set(dscrmntr.neurons[i].addresses.keys())))
 
-        distance = (1 + d_intersection)/(1 + d_union)
+        distance = (1 + d_intersection) / (1 + d_union)
         return distance
 
     def is_useful(self):

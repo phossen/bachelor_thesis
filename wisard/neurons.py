@@ -29,7 +29,7 @@ class Neuron(object):
         """
         Records the given address.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def is_set(self, address):
         """
@@ -41,7 +41,7 @@ class Neuron(object):
         """
         Bleaches RAM entries based on a defined model.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
     def remove(self, address):
         """
@@ -49,7 +49,7 @@ class Neuron(object):
         """
         try:
             del self.locations[address]
-        except:
+        except BaseException:
             pass
 
     def clear(self):
@@ -62,17 +62,17 @@ class Neuron(object):
         """
         Returns the intersection level between two neurons.
         """
-        raise NotImplementedError('This method is abstract. Override it.')
+        raise NotImplementedError("This method is abstract. Override it.")
 
 
 class SetNeuron(Neuron):
     """
-    This is the simplest neuron that just records 
-    whether a RAM location was written 
+    This is the simplest neuron that just records
+    whether a RAM location was written
     """
 
     def __init__(self, address_length=None):
-        super.__init__(address_length)
+        super().__init__(address_length)
         self.locations = set()
 
     def record(self, address):
@@ -81,7 +81,7 @@ class SetNeuron(Neuron):
     def remove(self, address):
         try:
             self.locations.remove(address)
-        except:
+        except BaseException:
             pass
 
     def intersection_level(self, neuron):
@@ -103,7 +103,7 @@ class DictNeuron(Neuron):
     """
 
     def __init__(self, address_length=None):
-        super.__init__(address_length)
+        super().__init__(address_length)
         self.locations = cl.defaultdict(int)
 
     def record(self, address, intensity=1):
@@ -124,7 +124,8 @@ class DictNeuron(Neuron):
                 del self.locations[address]
 
     def intersection_level(self, neuron):
-        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
+        len_intrsctn = float(
+            len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
 
@@ -142,7 +143,7 @@ class SWNeuron(Neuron):
     """
 
     def __init__(self, address_length=None):
-        super.__init__(address_length)
+        super().__init__(address_length)
         self.locations = cl.OrderedDict()
 
     def record(self, address, time):
@@ -152,11 +153,12 @@ class SWNeuron(Neuron):
         """
         Clears the locations recorded before the time threshold.
         """
-        for address, time in zip(self.locations.keys(), self.locations.values()):
+        for address, time in zip(self.locations.keys(),
+                                 self.locations.values()):
             if time < threshold:
                 del self.locations[address]
             else:
-                break # end because Dict is orderd
+                break  # end because Dict is orderd
 
     def intersection_level(self, neuron):
         """
@@ -165,6 +167,7 @@ class SWNeuron(Neuron):
         Considering a & b the intersection of the locations written in both
         neurons and a | b their union, this method returns (a & b)/(a | b).
         """
-        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
+        len_intrsctn = float(
+            len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
