@@ -30,9 +30,9 @@ class WiSARD(object):
         """
         raise NotImplementedError("This method is abstract. Override it.")
 
-    def record(self, observation, class_):
+    def record(self, observation):
         """
-        Record the provided observation, relating it to the given class.
+        Record the provided observation.
         """
         raise NotImplementedError("This method is abstract. Override it.")
 
@@ -71,10 +71,10 @@ class WCDS(WiSARD):
 
         Parameters
         ----------
-            omega : Defines temporal sliding window length
+            omega : Temporal sliding window length
             delta : Number of neurons in discriminators
-            gamma : Controls encoding resolution
-            epsilon : Threshold for creating new discriminator
+            gamma : Encoding resolution
+            epsilon : Threshold for creating a new discriminator
             dimension : Dimension of the incoming instances
             µ : Cardinality weight to tackle cluster imbalance
             discriminator_factory : Callable to create Discriminators
@@ -84,16 +84,8 @@ class WCDS(WiSARD):
         self.omega = omega
         self.delta = delta
         self.gamma = gamma
-        self.beta = int(
-            gamma *
-            dimension /
-            delta) if (
-            gamma *
-            dimension /
-            delta).is_integer() else self._adjust_gamma(
-            gamma,
-            dimension,
-            delta)  # Length of the addresses
+        temp = gamma*dimension/delta
+        self.beta = int(temp) if (temp).is_integer() else self._adjust_gamma(gamma,dimension,delta)  # Length of the addresses
         self.epsilon = epsilon
         self.µ = µ
         self.dimension = dimension
@@ -108,48 +100,58 @@ class WCDS(WiSARD):
     def _adjust_gamma(self, gamma, dimension, delta):
         """
         The parameters have to fulfill the property:
-        beta = (gamma * dimension) / delta
+            beta = (gamma * dimension) / delta
         This function is called if this is not the case
         and adjusts gamma automatically and returns new
         beta.
         """
         beta = int(round(gamma * dimension / delta))
         self.gamma = int((beta * delta) / dimension)
-        print("WARNING! Adjusted gamma to the clusterers needs: ", self.gamma)
+        print("WARNING! Adjusted gamma ({}) to the clusterers needs ({}).".format(gamma, self.gamma))
         return beta
 
     def record(self, observation, time, verbose=0):
         """
         Absorbs observation and time.
+        If verbosity is 1, prints information.
         """
+        if verbose: print("Received: Observation: {}, Time: {}".format(observation, time))
+
         # Delete outdated information
-        self.bleach(time - self.omega)
+        deleted_addr = self.bleach(time - self.omega)
+        if verbose: print("Deleted {} outdated addresses.".format(deleted_addr))
 
         # Delete useless discriminators
-        self.clean_discriminators()
+        deleted_discr= self.clean_discriminators()
+        if verbose: print("Deleted {} empty discriminators.".format(deleted_discr))
 
         # Calculate addressing of the observation
         addressing = self.addressing(observation)
+        if verbose: print("Calculating addressing for the observation.")
 
         # Check if there is at least one discriminator
         if len(self.discriminators) > 0:
             # Choose index of best discriminator
             k = np.argmax([d.matching(addressing, self.µ)
                            for d in self.discriminators])
+            if verbose: print("Choosing best discriminator: {} with matching: {}".format(k, self.discriminators[k].matching(addressing, self.µ)))
 
             # If matching is too small create new discriminator
             if self.discriminators[k].matching(
                     addressing, self.µ) < self.epsilon:
+                if verbose: print("No appropriate discriminator - creating a new one")
                 d = self.discriminator_factory(self.delta)
                 self.discriminators.append(d)
                 k = len(self.discriminators) - 1
         else:
+            if verbose: print("No discriminators - creating a new one.")
             d = self.discriminator_factory(self.delta)
             self.discriminators.append(d)
             k = len(self.discriminators) - 1
 
         # Learn the current observation
         self.discriminators[k].record(addressing, time)
+        if verbose: print("Absorbed observation.\nCurrent number of discriminators: ", self.__len__())
 
     def predict(self, observation):
         """
@@ -164,17 +166,24 @@ class WCDS(WiSARD):
         """
         Deletes the addresses in the discriminator neurons
         that are outdated with respect to the given threshold.
+        Returns the number of addresses deleted.
         """
+        count = 0
         for d in self.discriminators:
-            d.bleach(threshold)
+            count += d.bleach(threshold)
+        return count
 
     def clean_discriminators(self):
         """
         Delete all discriminators which have empty neurons only.
+        Returns the number ofe deleted discriminators.
         """
+        count = 0
         for d in self.discriminators:
             if not d.is_useful():
                 del d
+                count += 1
+        return count
 
     def addressing(self, observation):
         """
@@ -215,7 +224,8 @@ class WCDS(WiSARD):
             if x * resolution >= i:
                 b += (1,)
             else:
-                b += (0,)
+                b += (0,) * (resolution - len(b))
+                break
         return b
 
     def clear(self):

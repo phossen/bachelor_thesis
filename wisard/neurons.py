@@ -152,13 +152,18 @@ class SWNeuron(Neuron):
     def bleach(self, threshold):
         """
         Clears the locations recorded before the time threshold.
+        Returns the number of deleted addresses.
         """
+        count = 0
+
         for address, time in zip(self.locations.keys(),
                                  self.locations.values()):
             if time < threshold:
                 del self.locations[address]
+                count += 1
             else:
                 break  # end because Dict is orderd
+        return count
 
     def intersection_level(self, neuron):
         """

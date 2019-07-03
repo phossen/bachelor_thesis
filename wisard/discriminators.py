@@ -173,9 +173,12 @@ class SWDiscriminator(Discriminator):
     def bleach(self, threshold):
         """
         Dump all outdated data.
+        Returns number of deleted addresses.
         """
+        count = 0
         for neuron in self.neurons:
-            neuron.bleach(threshold)
+            count += neuron.bleach(threshold)
+        return count
 
     def matching(self, observation, µ=0):
         """
@@ -195,8 +198,8 @@ class SWDiscriminator(Discriminator):
 
     def intersection_level(self, dscrmntr):
         """
-        Calculates the intersection levek of this and
-        a given descriminator the way described in the
+        Calculates the intersection level of this and
+        a given discriminator the way described in the
         WCDS Paper.
         """
         d_union = 0
