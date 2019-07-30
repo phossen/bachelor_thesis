@@ -1,5 +1,6 @@
 import numpy as np
 import collections as cl
+import logging
 
 
 class Neuron(object):
@@ -67,8 +68,8 @@ class Neuron(object):
 
 class SetNeuron(Neuron):
     """
-    This is the simplest neuron that just records
-    whether a RAM location was written
+    This is the simplest neuron which just records
+    whether a RAM location was written.
     """
 
     def __init__(self, address_length=None):
@@ -114,18 +115,28 @@ class DictNeuron(Neuron):
 
     def bleach(self, threshold):
         """
-        If location is written and over the threshold, subtract the threshold.
-        If it's under the threshold delete the location.
+        If location was written more than threshold times, 
+        reduce by the threshold.
+        Otherwise delete the location.
+        Returns the number of deleted addresses.
         """
+        count = 0
         for address in self.locations.keys():
             if self.locations[address] > threshold:
                 self.locations[address] -= threshold
             else:
                 del self.locations[address]
+                count += 1
+        return count
 
     def intersection_level(self, neuron):
-        len_intrsctn = float(
-            len(self.locations.keys() & neuron.locations.keys()))
+        """
+        Returns the amount of locations written in both neurons.
+
+        Considering a & b the intersection of the locations written in both
+        neurons and a | b their union, this method returns (a & b)/(a | b).
+        """
+        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
 
@@ -155,7 +166,6 @@ class SWNeuron(Neuron):
         Returns the number of deleted addresses.
         """
         count = 0
-
         for address, time in zip(self.locations.keys(),
                                  self.locations.values()):
             if time < threshold:
@@ -172,7 +182,6 @@ class SWNeuron(Neuron):
         Considering a & b the intersection of the locations written in both
         neurons and a | b their union, this method returns (a & b)/(a | b).
         """
-        len_intrsctn = float(
-            len(self.locations.keys() & neuron.locations.keys()))
+        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
