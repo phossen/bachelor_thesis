@@ -117,7 +117,8 @@ class HitDiscriminator(Discriminator):
         The intersection between two discriminators is defined as
         the mean intersection of its neurons.
         """
-        return np.mean([na.intersection_level(nb) for na, nb in zip(self.neurons, dscrmntr.neurons)])
+        return np.mean([na.intersection_level(nb)
+                        for na, nb in zip(self.neurons, dscrmntr.neurons)])
 
 
 class FrequencyDiscriminator(Discriminator):
@@ -240,10 +241,16 @@ class SWDiscriminator(Discriminator):
                 return True
         return False
 
-    def merge(self, dscrmntr): 
+    def merge(self, dscrmntr):
         for i in range(len(self.neurons)):
-            intersection = set(self.neurons[i].locations.keys()) & set(dscrmntr.neurons[i].locations.keys())
-            self.neurons[i].locations = {**self.neurons[i].locations, **dscrmntr.neurons[i].locations}
-            if len(intersection) != 0: # Need to differentiate regarding most recent timestamp
+            intersection = set(
+                self.neurons[i].locations.keys()) & set(
+                dscrmntr.neurons[i].locations.keys())
+            self.neurons[i].locations = {
+                **self.neurons[i].locations,
+                **dscrmntr.neurons[i].locations}
+            if len(
+                    intersection) != 0:  # Need to differentiate regarding most recent timestamp
                 for j in intersection:
-                    self.neurons[i].locations[j] = max(self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])
+                    self.neurons[i].locations[j] = max(
+                        self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])

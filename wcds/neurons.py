@@ -115,7 +115,7 @@ class DictNeuron(Neuron):
 
     def bleach(self, threshold):
         """
-        If location was written more than threshold times, 
+        If location was written more than threshold times,
         reduce by the threshold.
         Otherwise delete the location.
         Returns the number of deleted addresses.
@@ -136,7 +136,8 @@ class DictNeuron(Neuron):
         Considering a & b the intersection of the locations written in both
         neurons and a | b their union, this method returns (a & b)/(a | b).
         """
-        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
+        len_intrsctn = float(
+            len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
 
@@ -182,6 +183,7 @@ class SWNeuron(Neuron):
         Considering a & b the intersection of the locations written in both
         neurons and a | b their union, this method returns (a & b)/(a | b).
         """
-        len_intrsctn = float(len(self.locations.keys() & neuron.locations.keys()))
+        len_intrsctn = float(
+            len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union

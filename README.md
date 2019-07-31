@@ -11,12 +11,8 @@ Possible Changes:
 * Add neuron types
 * Add discriminator types
 * Add wisard types
+* Add `__str__` method to all object types
 
-* Code visualisierung, Visualizing epsilon Area discriminators
-* use multiprocessing; improve code regarding efficency
-* include getting batches at same time?
-* logging module, make logging optional due to performance
-* Save more efficient by using integers
-* WCDS: Logging, logger format, Multiprocessing, test wrong mapping, import clustering, implement load, use pickle instead of json (to json in every layer?)
-* autopep8
+* Implement `load()` in WCDS
+* use multiprocessing; improve code regarding efficency,  include getting batches at same time?
 * git add, commit, push

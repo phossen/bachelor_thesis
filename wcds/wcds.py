@@ -9,8 +9,11 @@ import os
 import logging
 
 
-# To log more detailed change level to logging.DEBUG
-logging.basicConfig(filename="wcds.log", filemode="w", format='%(asctime)s %(message)s', level=logging.ERROR)
+logging.basicConfig(
+    filename="wcds.log",
+    filemode="w",
+    format='%(asctime)s %(message)s',
+    level=logging.DEBUG)
 
 
 class WiSARD(object):
@@ -64,7 +67,8 @@ class WCDS(WiSARD):
     Data Streams).
     """
 
-    def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0, discriminator_factory=SWDiscriminator, mapping="random", seed=random.randint(0, sys.maxsize)):
+    def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0,
+                 discriminator_factory=SWDiscriminator, mapping="random", seed=random.randint(0, sys.maxsize)):
         """
         Constructor for WCDS.
 
@@ -84,7 +88,8 @@ class WCDS(WiSARD):
         self.delta = delta
         self.gamma = gamma
         temp = (gamma * dimension) / delta
-        self.beta = int(temp) if (temp).is_integer() else self._adjust_gamma(gamma,dimension,delta)  # Length of the addresses
+        self.beta = int(temp) if (temp).is_integer() else self._adjust_gamma(
+            gamma, dimension, delta)  # Length of the addresses
         self.epsilon = epsilon
         self.µ = µ
         self.dimension = dimension
@@ -92,8 +97,18 @@ class WCDS(WiSARD):
         self.seed = seed
         self.discriminator_factory = discriminator_factory
         self.discriminators = {}
-        self.discriminator_id = 0 # Currently unassigned id
-        logging.info("Initialized WCDS with:\n Omega {}\n Delta {}\n Gamma {}\n Beta {}\n Epsilon {}\n Mu {}\n Dimension {}\n Seed {}\n {} mapping".format(omega, delta, gamma, self.beta, epsilon, µ, dimension, seed, mapping))
+        self.discriminator_id = 0  # Currently unassigned id
+        logging.info(
+            "Initialized WCDS with:\n Omega {}\n Delta {}\n Gamma {}\n Beta {}\n Epsilon {}\n Mu {}\n Dimension {}\n Seed {}\n {} mapping".format(
+                omega,
+                delta,
+                gamma,
+                self.beta,
+                epsilon,
+                µ,
+                dimension,
+                seed,
+                mapping))
 
     def __len__(self):
         return len(self.discriminators)
@@ -109,7 +124,9 @@ class WCDS(WiSARD):
         """
         beta = int(round(gamma * dimension / delta))
         self.gamma = int((beta * delta) / dimension)
-        logging.warning("Adjusted gamma ({}) to the clusterers needs ({}).".format(gamma, self.gamma))
+        logging.warning(
+            "Adjusted gamma ({}) to the clusterers needs ({}).".format(
+                gamma, self.gamma))
         return beta
 
     def record(self, observation, time):
@@ -118,7 +135,9 @@ class WCDS(WiSARD):
         Returns the id of the discriminator
         that absorbed the observation.
         """
-        logging.info("Received: Observation: {} Time: {}".format(observation, time))
+        logging.info(
+            "Received: Observation: {} Time: {}".format(
+                observation, time))
 
         # Delete outdated information
         deleted_addr = self.bleach(time - self.omega)
@@ -130,23 +149,29 @@ class WCDS(WiSARD):
 
         # Calculate addressing of the observation
         addressing = self.addressing(observation)
-        logging.info("Calculating addressing for the observation.")
+        logging.info("Calculated addressing: {}".format(addressing))
 
         # Check if there is at least one discriminator
         if len(self.discriminators) > 0:
             # Calculate id and matching of best fitting discriminator
             k, confidence = self.predict(addressing)
-            logging.info("Best discriminator {} matches {}%".format(k, confidence*100))
+            logging.info(
+                "Best discriminator {} matches {}%".format(
+                    k, confidence * 100))
 
             # If matching is too small create new discriminator
             if confidence < self.epsilon:
-                logging.info("Matching is too small. Creating new discriminator with id {}".format(self.discriminator_id))
-                d = self.discriminator_factory(self.delta, self.discriminator_id)
+                logging.info(
+                    "Matching is too small. Creating new discriminator with id {}".format(
+                        self.discriminator_id))
+                d = self.discriminator_factory(
+                    self.delta, self.discriminator_id)
                 self.discriminators[self.discriminator_id] = d
                 k = self.discriminator_id
                 self.discriminator_id += 1
         else:
-            logging.info("No discriminators - creating a new one with id {}".format(self.discriminator_id))
+            logging.info(
+                "No discriminators - creating a new one with id {}".format(self.discriminator_id))
             d = self.discriminator_factory(self.delta, self.discriminator_id)
             self.discriminators[self.discriminator_id] = d
             k = self.discriminator_id
@@ -154,7 +179,9 @@ class WCDS(WiSARD):
 
         # Absorb the current observation
         self.discriminators[k].record(addressing, time)
-        logging.info("Absorbed observation. Current number of discriminators: {}".format(self.__len__()))
+        logging.info(
+            "Absorbed observation. Current number of discriminators: {}".format(
+                self.__len__()))
 
         return k
 
@@ -164,13 +191,15 @@ class WCDS(WiSARD):
         If two discriminators return the same matching, the first one
         is taken due to the implementation of sort.
         """
-        predictions = [(d, self.discriminators[d].matching(addressing, self.µ)) for d in self.discriminators]
+        predictions = [(d, self.discriminators[d].matching(
+            addressing, self.µ)) for d in self.discriminators]
         if len(predictions) == 1:
             return predictions[0]
         predictions.sort(key=lambda x: x[1])
         k, confidence = predictions[-1]
         if predictions[-1][0] == predictions[-2][0]:
-            logging.warn("Found two discriminators with the same matching. Choosing the first one ({}).".format(k))
+            logging.warning(
+                "Found two discriminators with the same matching. Choosing the first one ({}).".format(k))
         return k, confidence
 
     def bleach(self, threshold):
@@ -201,30 +230,40 @@ class WCDS(WiSARD):
         Calculate and return the
         addressing for a given observation.
         """
-        binarization = np.array([self._binarize(x_i, self.gamma) for x_i in observation])
+        binarization = np.array(
+            [self._binarize(x_i, self.gamma) for x_i in observation])
 
         if self.mapping == "linear":
             binarization = binarization.flatten()
             binarization = np.reshape(binarization, (self.delta, self.beta))
-            tuple_addressing = [tuple(b) for b in binarization]
-            return tuple_addressing
+            addressing = [self._bit_to_int(b) for b in binarization]
+            return addressing
         elif self.mapping == "random":
             binarization = binarization.flatten()
             random.seed(self.seed)
             random.shuffle(binarization)
             binarization = np.reshape(binarization, (self.delta, self.beta))
-            tuple_addressing = [tuple(b) for b in binarization]
-            return tuple_addressing
+            addressing = [self._bit_to_int(b) for b in binarization]
+            return addressing
         else:
             raise KeyError("Mapping has an invalid value!")
+
+    def _bit_to_int(self, bits):
+        """
+        Returns integer for list of bits.
+        """
+        out = 0
+        for bit in bits:
+            out = (out << 1) | bit
+        return out
 
     def _binarize(self, x, resolution):
         """
         Binarize given x using thermometer encoding.
         """
-        b = tuple()
-        b += (1,) * (int(x * resolution))
-        b += (0,) * (resolution - len(b))
+        b = list()
+        b.extend([1 for _ in range(int(x * resolution))])
+        b.extend([0 for _ in range(resolution - len(b))])
         return b
 
     def clear(self):
@@ -248,15 +287,12 @@ class WCDS(WiSARD):
         discr = {}
         for d in self.discriminators.values():
             n_dict = {}
-            for n in d.neurons:
-                for i in range(len(n.locations)):
-                    n_content = []
-                    for key, value in zip(n.locations.keys(), n.locations.values()):
-                        address = [str(i) for i in list(key)]
-                        timestamp = int(value)
-                        new_tup = tuple(("".join(address), timestamp))
-                        n_content.append(new_tup)
-                    n_dict[i] = n_content
+            for n, i in zip(d.neurons, range(self.delta)):
+                n_content = []
+                for key, value in zip(n.locations.keys(),
+                                      n.locations.values()):
+                    n_content.append((int(key), int(value)))
+                n_dict[i] = n_content
             discr[d.id_] = n_dict
         confg["discriminators"] = discr
 

@@ -5,7 +5,7 @@ import logging
 
 class AgglomerativeClustering(object):
     """
-    Agglomerative clustering specially implemented 
+    Agglomerative clustering specially implemented
     for WCDS and the sliding window version.
     """
 
@@ -20,16 +20,20 @@ class AgglomerativeClustering(object):
             n_clusters : The number of clusters to find. It must be None if distance_threshold is not None.
             distance_threshold : The linkage distance threshold under which, clusters will not be merged. If not None, n_clusters must be None.
         """
-        if (n_clusters is None and distance_threshold is None) or (n_clusters is not None and distance_threshold is not None):
-            raise KeyError("Check parameters n_clusters and distance_threshold!")
-            
-        # Copy given dictionary, as we just want to extract knowledge and not change real state
+        if (n_clusters is None and distance_threshold is None) or (
+                n_clusters is not None and distance_threshold is not None):
+            raise KeyError(
+                "Check parameters n_clusters and distance_threshold!")
+
+        # Copy given dictionary, as we just want to extract knowledge and not
+        # change real state
         X = copy.deepcopy(X)
         discr = list(X.values())
         ids = list(X.keys())
         merges = []
 
-        # Compute (dis)similarities between every pair of objects in the data set
+        # Compute (dis)similarities between every pair of objects in the data
+        # set
         distances = np.zeros((len(discr), len(discr)))
         for i in range(len(discr)):
             for j in range(len(discr)):
@@ -40,25 +44,30 @@ class AgglomerativeClustering(object):
 
         while True:
             # Stop conditions
-            if len(distances[0]) == n_clusters:
+            if len(distances) == n_clusters:
                 logging.info("Number of clusters reached.")
                 break
             if distance_threshold is not None:
                 if np.max(distances) < distance_threshold:
-                    logging.info("Nothing to merge anymore, discriminators too dissimilar.")
+                    logging.info(
+                        "Nothing to merge anymore, discriminators too dissimilar.")
                     break
 
             # Get position of highest intersection
             pos_highest = np.unravel_index(distances.argmax(), distances.shape)
             first = pos_highest[0]
             second = pos_highest[1]
-            logging.info("Highest intersection level at {} with {}%".format(pos_highest, distances[first][second]))
+            logging.info(
+                "Highest intersection level at {} with {}%".format(
+                    pos_highest, distances[first][second]))
 
-            # Merge and delete unnecessary discriminator
+            # Merge discriminators and delete unnecessary one
             pos_ids = (ids[first], ids[second])
             discr[first].merge(discr[second])
             merges.append(pos_ids)
-            logging.info("Merging discriminator {} into {} and deleting {}.".format(second, first, second))
+            logging.info(
+                "Merging discriminator {} into {} and deleting {}.".format(
+                    second, first, second))
             del ids[second]
             del discr[second]
 
@@ -70,7 +79,8 @@ class AgglomerativeClustering(object):
             # Recalculate distances
             for i in range(len(distances)):
                 if i != first:
-                    distances[i][first] = discr[first].intersection_level(discr[i])
+                    distances[i][first] = discr[first].intersection_level(
+                        discr[i])
                     distances[first][i] = distances[i][first]
             logging.info("Recalculated distances.")
 
