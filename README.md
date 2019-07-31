@@ -12,7 +12,6 @@ Possible Changes:
 * Add discriminator types
 * Add wisard types
 * Add `__str__` method to all object types
-
+* Use multiprocessing to optimize performance (addressing, bleach, predict, clear, ...)
+* Implement getting list of Instances at same time point
 * Implement `load()` in WCDS
-* use multiprocessing; improve code regarding efficency,  include getting batches at same time?
-* git add, commit, push
