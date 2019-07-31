@@ -30,6 +30,7 @@ class AgglomerativeClustering(object):
         X = copy.deepcopy(X)
         discr = list(X.values())
         ids = list(X.keys())
+        self.ids = ids
         merges = []
 
         # Compute (dis)similarities between every pair of objects in the data
@@ -48,7 +49,7 @@ class AgglomerativeClustering(object):
                 logging.info("Number of clusters reached.")
                 break
             if distance_threshold is not None:
-                if np.max(distances) < distance_threshold:
+                if np.max(distances.flatten()) < distance_threshold:
                     logging.info(
                         "Nothing to merge anymore, discriminators too dissimilar.")
                     break
@@ -132,5 +133,15 @@ class AgglomerativeClustering(object):
                         break
                 if do_break:
                     break
+
+        # Step 3: Merge unmerged clusters/single discriminators
+        for i in self.ids:
+            found = False
+            for cluster in cluster_groups:
+                if i in cluster:
+                    found = True
+                    break
+            if not found:
+                cluster_groups.append({i})
 
         return cluster_groups
