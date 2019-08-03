@@ -24,6 +24,9 @@ class AgglomerativeClustering(object):
                 n_clusters is not None and distance_threshold is not None):
             raise KeyError(
                 "Check parameters n_clusters and distance_threshold!")
+        if n_clusters is not None:
+            if n_clusters > len(X):
+                raise KeyError("Can't build more clusters than given!")
 
         # Copy given dictionary, as we just want to extract knowledge and not
         # change real state

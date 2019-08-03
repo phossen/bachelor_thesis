@@ -121,7 +121,7 @@ class DictNeuron(Neuron):
         Returns the number of deleted addresses.
         """
         count = 0
-        for address in self.locations.keys():
+        for address in list(self.locations.keys()):
             if self.locations[address] > threshold:
                 self.locations[address] -= threshold
             else:
@@ -167,8 +167,8 @@ class SWNeuron(Neuron):
         Returns the number of deleted addresses.
         """
         count = 0
-        for address, time in zip(self.locations.keys(),
-                                 self.locations.values()):
+        for address, time in zip(list(self.locations.keys()),
+                                 list(self.locations.values())):
             if time < threshold:
                 del self.locations[address]
                 count += 1

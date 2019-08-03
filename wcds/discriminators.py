@@ -249,7 +249,8 @@ class SWDiscriminator(Discriminator):
             self.neurons[i].locations = {
                 **self.neurons[i].locations,
                 **dscrmntr.neurons[i].locations}
-            if len(intersection) != 0:  # Need to differentiate regarding most recent timestamp
+            if len(
+                    intersection) != 0:  # Need to differentiate regarding most recent timestamp
                 for j in intersection:
                     self.neurons[i].locations[j] = max(
                         self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])
