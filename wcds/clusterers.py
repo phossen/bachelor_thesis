@@ -1,5 +1,4 @@
 import numpy as np
-import copy
 import logging
 
 
@@ -25,12 +24,11 @@ class AgglomerativeClustering(object):
             raise KeyError(
                 "Check parameters n_clusters and distance_threshold!")
         if n_clusters is not None:
-            if n_clusters > len(X):
-                raise KeyError("Can't build more clusters than given!")
+            if n_clusters >= len(X):
+                logging.warning("Target number greater or equal to given number of clusters!")
+                return set(X.keys())
 
-        # Copy given dictionary, as we just want to extract knowledge and not
-        # change real state
-        X = copy.deepcopy(X)
+        # Creating lists needed throughout the clustering process
         discr = list(X.values())
         ids = list(X.keys())
         self.ids = ids
@@ -93,7 +91,7 @@ class AgglomerativeClustering(object):
     def _get_clusters(self, merges):
         """
         Returns a list of clusters (as sets) containing the discriminator
-        id's belonging into it, given a list of merges (as tuples).
+        ids belonging into it, given a list of merges (as tuples).
         """
         # Step 1: Group cluster merges into sets
         cluster_groups = []

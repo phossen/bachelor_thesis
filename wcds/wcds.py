@@ -3,9 +3,9 @@ from .neurons import *
 from .clusterers import *
 import random
 import numpy as np
+import math
 import json
 import sys
-import os
 import logging
 import multiprocessing as mp
 
@@ -220,9 +220,9 @@ class WCDS(WiSARD):
         Returns the number of deleted discriminators.
         """
         count = 0
-        for d in self.discriminators.values():
-            if not d.is_useful():
-                del d
+        for k in list(self.discriminators.keys()):
+            if not self.discriminators[k].is_useful():
+                del self.discriminators[k]
                 count += 1
         return count
 
@@ -275,7 +275,10 @@ class WCDS(WiSARD):
         Saves the current configuration into a JSON file.
         """
         confg = {}
-        confg["omega"] = self.omega
+        if self.omega == math.inf:
+            confg["omega"] = str(self.omega)
+        else:
+            confg["omega"] = self.omega
         confg["delta"] = self.delta
         confg["gamma"] = self.gamma
         confg["beta"] = self.beta
