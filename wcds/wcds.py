@@ -1,13 +1,12 @@
 from .discriminators import *
 from .neurons import *
-from .clusterers import *
 import random
 import numpy as np
 import math
 import json
 import sys
+import operator
 import logging
-import multiprocessing as mp
 
 
 logging.basicConfig(
@@ -65,7 +64,7 @@ class WiSARD(object):
 class WCDS(WiSARD):
     """
     This class implements WCDS (WiSARD for Clustering
-    Data Streams).
+    Data Streams) - but only the only step.
     """
 
     def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0,
@@ -85,12 +84,8 @@ class WCDS(WiSARD):
             mapping : Maptype used in addressing, either "linear" or "random"
             seed : Used to make results replicable in random mapping
         """
+        self._adjust_parameters(gamma, dimension, delta)
         self.omega = omega
-        self.delta = delta
-        self.gamma = gamma
-        temp = (gamma * dimension) / delta
-        self.beta = int(temp) if (temp).is_integer() else self._adjust_gamma(
-            gamma, dimension, delta)  # Length of the addresses
         self.epsilon = epsilon
         self.µ = µ
         self.dimension = dimension
@@ -101,34 +96,52 @@ class WCDS(WiSARD):
         self.discriminator_id = 0  # Currently unassigned id
         logging.info(
             "Initialized WCDS with:\n Omega {}\n Delta {}\n Gamma {}\n Beta {}\n Epsilon {}\n Mu {}\n Dimension {}\n Seed {}\n {} mapping".format(
-                omega,
-                delta,
-                gamma,
+                self.omega,
+                self.delta,
+                self.gamma,
                 self.beta,
-                epsilon,
-                µ,
-                dimension,
-                seed,
-                mapping))
+                self.epsilon,
+                self.µ,
+                self.dimension,
+                self.seed,
+                self.mapping))
 
     def __len__(self):
         return len(self.discriminators)
 
-    def _adjust_gamma(self, gamma, dimension, delta):
+    def _adjust_parameters(self, gamma, dimension, delta):
         """
         The parameters have to fulfill the property:
-            beta = (gamma * dimension) / delta
+            gamma * dimension = delta * beta
         with everything being an integer.
-        This function is called if this is not the case
-        and adjusts gamma automatically and returns new
-        beta.
+        This function ensures this.
         """
-        beta = int(round(gamma * dimension / delta))
-        self.gamma = int((beta * delta) / dimension)
-        logging.warning(
-            "Adjusted gamma ({}) to the clusterers needs ({}).".format(
-                gamma, self.gamma))
-        return beta
+        if delta == gamma:
+            self.gamma = gamma
+            self.delta = delta
+            self.beta = dimension
+            return
+        if dimension * gamma == delta:
+            self.gamma = gamma
+            self.delta = delta
+            self.beta = 1
+            return
+        logging.warn("Had to adjust parameters.")
+        if dimension * gamma < delta:
+            self.gamma = int(round((1. * delta) / dimension))
+            self.delta = dimension * self.gamma
+            self.beta = 1
+            return
+        if (dimension * 1. * gamma / delta).is_integer():
+            self.beta = int(dimension * gamma / delta)
+            self.gamma = gamma
+            self.delta = delta
+        else:
+            self.beta = dimension * gamma // delta
+            self.delta = delta
+            while not (delta * self.beta / dimension).is_integer():
+                self.beta += 1
+            self.gamma = int(delta * self.beta / dimension)
 
     def record(self, observation, time):
         """
@@ -171,6 +184,7 @@ class WCDS(WiSARD):
                 k = self.discriminator_id
                 self.discriminator_id += 1
         else:
+            # No discriminator yet
             logging.info(
                 "No discriminators - creating a new one with id {}".format(self.discriminator_id))
             d = self.discriminator_factory(self.delta, self.discriminator_id)
@@ -226,6 +240,39 @@ class WCDS(WiSARD):
                 count += 1
         return count
 
+    def centroid(self, discr):
+        """
+        Approximates the centroid of a given discriminator.
+        To properly work, the discriminator should not have
+        been affected by a split beforehand.
+        """
+        # Step 1: Calculate the mapped matrix
+        mapped_matrix = []
+        for neuron in discr.neurons:
+            mean_address = tuple([0 for _ in range(self.beta)])
+            for loc in neuron.locations:
+                mean_address = tuple(map(operator.add, mean_address, loc))
+            if len(neuron.locations) > 0:
+                mean_address = tuple([x / len(neuron.locations)
+                                      for x in mean_address])
+            mapped_matrix.append(mean_address)
+        mapped_matrix = np.array(mapped_matrix).flatten()
+
+        # Step 2: Undo random mapping
+        mapping = list(range(len(mapped_matrix)))
+        random.seed(self.seed)
+        random.shuffle(mapping)
+        unmapped_matrix = np.zeros(len(mapped_matrix))
+        for i, j in enumerate(mapping):
+            unmapped_matrix[j] = mapped_matrix[i]
+        unmapped_matrix = unmapped_matrix.reshape((self.dimension, self.gamma))
+
+        # Step 3: Calculate centroid coordinates
+        coordinates = []
+        for i in range(len(unmapped_matrix)):
+            coordinates.append(float(sum(unmapped_matrix[i]) / self.gamma))
+        return coordinates
+
     def addressing(self, observation):
         """
         Calculate and return the
@@ -237,14 +284,14 @@ class WCDS(WiSARD):
         if self.mapping == "linear":
             binarization = binarization.flatten()
             binarization = np.reshape(binarization, (self.delta, self.beta))
-            addressing = [self._bit_to_int(b) for b in binarization]
+            addressing = [tuple(b) for b in binarization]
             return addressing
         elif self.mapping == "random":
             binarization = binarization.flatten()
             random.seed(self.seed)
             random.shuffle(binarization)
             binarization = np.reshape(binarization, (self.delta, self.beta))
-            addressing = [self._bit_to_int(b) for b in binarization]
+            addressing = [tuple(b) for b in binarization]
             return addressing
         else:
             raise KeyError("Mapping has an invalid value!")
@@ -252,6 +299,7 @@ class WCDS(WiSARD):
     def _bit_to_int(self, bits):
         """
         Returns integer for list of bits.
+        WARNING: Does not handle too large integers.
         """
         out = 0
         for bit in bits:
@@ -287,15 +335,16 @@ class WCDS(WiSARD):
         confg["dimension"] = self.dimension
         confg["mapping"] = self.mapping
         confg["seed"] = self.seed
+        confg["discriminator_id"] = self.discriminator_id
 
         discr = {}
         for d in self.discriminators.values():
             n_dict = {}
-            for n, i in zip(d.neurons, range(self.delta)):
+            for i, n in enumerate(d.neurons):
                 n_content = []
                 for key, value in zip(n.locations.keys(),
                                       n.locations.values()):
-                    n_content.append((int(key), int(value)))
+                    n_content.append(([int(x) for x in key], int(value)))
                 n_dict[i] = n_content
             discr[d.id_] = n_dict
         confg["discriminators"] = discr
@@ -303,3 +352,38 @@ class WCDS(WiSARD):
         with open(path, "w") as write_file:
             json.dump(confg, write_file, indent=4)
         logging.info("Saved current configuration to {}".format(path))
+
+    def load(self, path="wcds.json"):
+        """
+        Loads the configuration stored in a JSON file.
+        """
+        with open(path, 'r') as read_file:
+            confg = json.load(read_file)
+        if isinstance(confg["omega"], str):
+            self.omega = math.inf
+        else:
+            self.omega = confg["omega"]
+        self.delta = confg["delta"]
+        self.gamma = confg["gamma"]
+        self.beta = confg["beta"]
+        self.epsilon = confg["epsilon"]
+        self.µ = confg["mu"]
+        self.dimension = confg["dimension"]
+        self.mapping = confg["mapping"]
+        self.seed = confg["seed"]
+        self.discriminator_id = confg["discriminator_id"]
+        self.discriminator_factory = SWDiscriminator
+
+        self.discriminators.clear()
+        discr = confg["discriminators"]
+        for key, d in zip(discr.keys(), discr.values()):
+            current_discr = self.discriminator_factory(
+                self.delta, key, creation_time="unknown")
+            for n, content in zip(current_discr.neurons, d.values()):
+                for c in content:
+                    address = tuple(c[0])
+                    time_ = int(c[1])
+                    n.locations[address] = time_
+            self.discriminators[key] = current_discr
+
+        logging.info("Loaded configuration from {}".format(path))

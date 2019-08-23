@@ -1,6 +1,6 @@
 from .neurons import *
 import numpy as np
-import collections as cl
+import random
 import logging
 
 
@@ -172,8 +172,10 @@ class SWDiscriminator(Discriminator):
     This class implements a sliding window discriminator.
     """
 
-    def __init__(self, no_neurons, id_, neuron_factory=SWNeuron):
+    def __init__(self, no_neurons, id_, neuron_factory=SWNeuron,
+                 creation_time=None):
         super().__init__(no_neurons, id_, neuron_factory)
+        self.creation_time = None
 
     def __len__(self):
         """
@@ -181,14 +183,18 @@ class SWDiscriminator(Discriminator):
         which is defined as the multiplication
         of the length of all its neurons.
         """
+        # Use longest neuron, use total amount of addresses, maintain during
+        # functions
         length = 1
         for neuron in self.neurons:
             length *= len(neuron)
         return length
 
-    def record(self, observation, time):
+    def record(self, observation, time_):
+        if self.creation_time is None:
+            self.creation_time = time_
         for address, neuron in zip(observation, self.neurons):
-            neuron.record(address, time)
+            neuron.record(address, time_)
 
     def bleach(self, threshold):
         """
@@ -212,6 +218,7 @@ class SWDiscriminator(Discriminator):
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
                 match += 1
+                # match / 1/len(self.neurons)
         return ((1. / self.no_neurons) * match) / \
             ((self.__len__())**(µ / self.no_neurons))
 
@@ -221,6 +228,7 @@ class SWDiscriminator(Discriminator):
         a given discriminator the way described in the
         WCDS Paper.
         """
+        # use intersection level of neurons! does it even make a difference?
         d_union = 0
         d_intersection = 0
         for i in range(self.no_neurons):
@@ -242,6 +250,10 @@ class SWDiscriminator(Discriminator):
         return False
 
     def merge(self, dscrmntr):
+        """
+        Merges the given discriminator into
+        this discriminator.
+        """
         for i in range(len(self.neurons)):
             intersection = set(
                 self.neurons[i].locations.keys()) & set(
@@ -249,7 +261,8 @@ class SWDiscriminator(Discriminator):
             self.neurons[i].locations = {
                 **self.neurons[i].locations,
                 **dscrmntr.neurons[i].locations}
-            if len(intersection) != 0:  # Need to differentiate regarding most recent timestamp
+            if len(
+                    intersection) != 0:  # Need to differentiate regarding most recent timestamp
                 for j in intersection:
                     self.neurons[i].locations[j] = max(
                         self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])

@@ -8,6 +8,7 @@ __pycache__/
 wisard/__pycache__/
 .idea/
 wcds.json
+discriminator.png
 
 # C extensions
 *.so
