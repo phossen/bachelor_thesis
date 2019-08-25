@@ -174,7 +174,6 @@ class DiscrVisual(Frame):
         # Plotting
         self.ax.clear()
         step = 0.01
-        cm_subsection = np.linspace(0.0, 1.0, 1000)
         colormap = cm.get_cmap("viridis")  # Adjust for other colors
         points = []
 

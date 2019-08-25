@@ -183,8 +183,6 @@ class SWDiscriminator(Discriminator):
         which is defined as the multiplication
         of the length of all its neurons.
         """
-        # Use longest neuron, use total amount of addresses, maintain during
-        # functions
         length = 1
         for neuron in self.neurons:
             length *= len(neuron)
@@ -218,9 +216,8 @@ class SWDiscriminator(Discriminator):
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
                 match += 1
-                # match / 1/len(self.neurons)
         return ((1. / self.no_neurons) * match) / \
-            ((self.__len__())**(µ / self.no_neurons))
+            ((self.__len__())**(float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
@@ -228,15 +225,19 @@ class SWDiscriminator(Discriminator):
         a given discriminator the way described in the
         WCDS Paper.
         """
-        # use intersection level of neurons! does it even make a difference?
-        d_union = 0
-        d_intersection = 0
+        intersec = 0
         for i in range(self.no_neurons):
-            d_union += len(set(self.neurons[i].locations.keys()).union(
-                set(dscrmntr.neurons[i].locations.keys())))
-            d_intersection += len(set(self.neurons[i].locations.keys()).intersection(
-                set(dscrmntr.neurons[i].locations.keys())))
-        return (1 + d_intersection) / (1 + d_union)
+            intersec += self.neurons[i].intersection_level(dscrmntr.neurons[i])
+        return intersec
+        # TODO: Compare to version of WCDS paper
+        #d_union = 0
+        #d_intersection = 0
+        # for i in range(self.no_neurons):
+        #    d_union += len(set(self.neurons[i].locations.keys()).union(
+        #        set(dscrmntr.neurons[i].locations.keys())))
+        #    d_intersection += len(set(self.neurons[i].locations.keys()).intersection(
+        #        set(dscrmntr.neurons[i].locations.keys())))
+        # return (1 + d_intersection) / (1 + d_union)
 
     def is_useful(self):
         """
@@ -266,3 +267,36 @@ class SWDiscriminator(Discriminator):
                 for j in intersection:
                     self.neurons[i].locations[j] = max(
                         self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])
+
+    def drasiw(self, seed, dimension, gamma):
+        """
+        Returns a list of points representing this discriminator.
+        """
+        points = set()
+        max_len = max([len(neuron) for neuron in self.neurons])
+
+        # Sampling points as often as maximum neuron length
+        for _ in range(max_len):
+            # Retreive random adresses
+            mapped_matrix = []
+            for i in range(len(self.neurons)):
+                sample = list(
+                    random.choice(
+                        list(
+                            self.neurons[i].locations.keys())))
+                mapped_matrix.extend(sample)
+            # Calculate mapping
+            mapping = list(range(len(mapped_matrix)))
+            random.seed(seed)
+            random.shuffle(mapping)
+            unmapped_matrix = np.zeros(len(mapped_matrix))
+            # Apply mapping in reverse
+            for i, j in enumerate(mapping):
+                unmapped_matrix[j] = mapped_matrix[i]
+            unmapped_matrix = unmapped_matrix.reshape((dimension, gamma))
+            point = []
+            # Calculate coordinates
+            for i in range(len(unmapped_matrix)):
+                point.append(float(sum(unmapped_matrix[i]) / gamma))
+            points.add(tuple(point))
+        return list(points)

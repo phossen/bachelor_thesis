@@ -13,7 +13,7 @@ logging.basicConfig(
     filename="wcds.log",
     filemode="w",
     format='%(asctime)s %(message)s',
-    level=logging.DEBUG)
+    level=logging.WARN)
 
 
 class WiSARD(object):

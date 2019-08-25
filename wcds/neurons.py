@@ -94,6 +94,8 @@ class SetNeuron(Neuron):
         """
         len_intrsctn = float(len(self.locations & neuron.locations))
         len_union = float(len(self.locations | neuron.locations))
+        if len_union == 0:
+            return 0
         return len_intrsctn / len_union
 
 
@@ -139,6 +141,8 @@ class DictNeuron(Neuron):
         len_intrsctn = float(
             len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
+        if len_union == 0:
+            return 0
         return len_intrsctn / len_union
 
     def count(self, address):
@@ -186,4 +190,6 @@ class SWNeuron(Neuron):
         len_intrsctn = float(
             len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
+        if len_union == 0:
+            return 0
         return len_intrsctn / len_union

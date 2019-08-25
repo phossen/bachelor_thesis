@@ -271,6 +271,7 @@ class CentroidClustering(Clusterer):
             linkage=linkage)
         clusterer.fit(centroids)
 
+        # Group discriminator ids into cluster groups
         clusters = []
         for c in np.unique(clusterer.labels_):
             cluster = set()
