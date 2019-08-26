@@ -46,6 +46,8 @@ class DiscrVisual(Frame):
         pane.add(right_frame)
 
         # Combobox and button
+        discr_label = Label(right_frame, text="Select discriminator..")
+        discr_label.pack()
         self.discriminator_box = ttk.Combobox(
             right_frame, values=self.discriminators, state="readonly")
         self.discriminator_box.pack()
