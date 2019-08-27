@@ -13,7 +13,7 @@ logging.basicConfig(
     filename="wcds.log",
     filemode="w",
     format='%(asctime)s %(message)s',
-    level=logging.WARN)
+    level=logging.DEBUG)
 
 
 class WiSARD(object):
@@ -211,11 +211,13 @@ class WCDS(WiSARD):
         if len(predictions) == 1:
             return predictions[0]
         predictions.sort(key=lambda x: x[1])
-        k, confidence = predictions[-1]
-        if predictions[-1][0] == predictions[-2][0]:
+        k, best_matching = predictions[-1]
+        confidence = predictions[-1][1] - predictions[-2][1]
+        logging.info("Predictions has a confidence of {}%".format(confidence*100))
+        if predictions[-1][1] == predictions[-2][1]:
             logging.warning(
                 "Found two discriminators with the same matching. Choosing the first one ({}).".format(k))
-        return k, confidence
+        return k, best_matching
 
     def bleach(self, threshold):
         """
