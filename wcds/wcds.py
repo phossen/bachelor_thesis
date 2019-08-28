@@ -7,6 +7,7 @@ import json
 import sys
 import operator
 import logging
+from collections import OrderedDict
 
 
 logging.basicConfig(
@@ -94,6 +95,7 @@ class WCDS(WiSARD):
         self.discriminator_factory = discriminator_factory
         self.discriminators = {}
         self.discriminator_id = 0  # Currently unassigned id
+        self.LRU = OrderedDict()
         logging.info(
             "Initialized WCDS with:\n Omega {}\n Delta {}\n Gamma {}\n Beta {}\n Epsilon {}\n Mu {}\n Dimension {}\n Seed {}\n {} mapping".format(
                 self.omega,
@@ -154,8 +156,22 @@ class WCDS(WiSARD):
                 observation, time))
 
         # Delete outdated information
-        deleted_addr = self.bleach(time - self.omega)
-        logging.info("Deleted {} outdated addresses.".format(deleted_addr))
+        #deleted_addr = self.bleach(time - self.omega)
+        lru_iter = iter(list(self.LRU.keys()))
+        try:
+            current = next(lru_iter)
+        except StopIteration:
+            current = None
+        if current is not None:
+            while self.LRU[current] < time - self.omega:
+                k, j, a = current
+                del self.discriminators[k].neurons[j].locations[a]
+                del self.LRU[current]
+                try:
+                    current = next(lru_iter)
+                except StopIteration:
+                    break
+        #logging.info("Deleted {} outdated addresses.".format(deleted_addr))
 
         # Delete useless discriminators
         deleted_discr = self.clean_discriminators()
@@ -194,6 +210,8 @@ class WCDS(WiSARD):
 
         # Absorb the current observation
         self.discriminators[k].record(addressing, time)
+        for i, address in enumerate(addressing):
+            self.LRU[(k, i, address)] = time
         logging.info(
             "Absorbed observation. Current number of discriminators: {}".format(
                 self.__len__()))
