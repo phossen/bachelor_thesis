@@ -221,7 +221,7 @@ class SWDiscriminator(Discriminator):
             if neuron.is_set(address):
                 match += 1
         return ((1. / self.no_neurons) * match) / \
-            ((self.__len__())**(float(µ) / self.no_neurons))
+            ((len(self)) ** (float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """

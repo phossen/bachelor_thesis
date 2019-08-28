@@ -182,7 +182,7 @@ class DiscrVisual(Frame):
         for i in np.arange(0, 1, step):
             for j in np.arange(0, 1, step):
                 matching_rate = self.c_online.discriminators[discr_id].matching(
-                    self.c_online.addressing((i, j)))
+                    self.c_online.addressing((i, j)), self.µ.get())
                 c = colormap(matching_rate)
                 points.append(((i, j), c))
         img = self.ax.scatter([point[0][0] for point in points],
