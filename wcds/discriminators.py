@@ -120,6 +120,10 @@ class HitDiscriminator(Discriminator):
         return np.mean([na.intersection_level(nb)
                         for na, nb in zip(self.neurons, dscrmntr.neurons)])
 
+    def merge(self, dscrmntr):
+        for i in range(len(self.neurons)):
+            self.neurons[i].merge(dscrmntr.neurons[i])
+
 
 class FrequencyDiscriminator(Discriminator):
     """
@@ -225,10 +229,8 @@ class SWDiscriminator(Discriminator):
         a given discriminator the way described in the
         WCDS Paper.
         """
-        intersec = 0
-        for i in range(self.no_neurons):
-            intersec += self.neurons[i].intersection_level(dscrmntr.neurons[i])
-        return intersec
+        return np.mean([na.intersection_level(nb)
+                        for na, nb in zip(self.neurons, dscrmntr.neurons)])
         # TODO: Compare to version of WCDS paper
         #d_union = 0
         #d_intersection = 0
@@ -256,17 +258,7 @@ class SWDiscriminator(Discriminator):
         this discriminator.
         """
         for i in range(len(self.neurons)):
-            intersection = set(
-                self.neurons[i].locations.keys()) & set(
-                dscrmntr.neurons[i].locations.keys())
-            self.neurons[i].locations = {
-                **self.neurons[i].locations,
-                **dscrmntr.neurons[i].locations}
-            if len(
-                    intersection) != 0:  # Need to differentiate regarding most recent timestamp
-                for j in intersection:
-                    self.neurons[i].locations[j] = max(
-                        self.neurons[i].locations[j], dscrmntr.neurons[i].locations[j])
+            self.neurons[i].merge(dscrmntr.neurons[i])
 
     def drasiw(self, seed, dimension, gamma):
         """

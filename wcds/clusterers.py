@@ -153,7 +153,7 @@ class MinDistanceClustering(Clusterer):
                 if do_break:
                     break
 
-        # Step 3: Merge unmerged clusters/single discriminators
+        # Step 3: Merge unmerged clusters/lonely discriminators
         for i in self.ids:
             found = False
             for cluster in cluster_groups:
@@ -170,7 +170,7 @@ class MergeClustering(MinDistanceClustering):
     """
     Agglomerative clustering based on the
     intersection levels of WiSARD's discriminators
-    with merging them. Corresponds to average linkage.
+    with merging them.
     """
 
     def __init__(self, n_clusters=None, distance_threshold=None):

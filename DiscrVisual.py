@@ -51,15 +51,15 @@ class DiscrVisual(Frame):
         self.discriminator_box = ttk.Combobox(
             right_frame, values=self.discriminators, state="readonly")
         self.discriminator_box.pack()
-        self.show_button = Button(
+        show_button = Button(
             right_frame,
             text='Show',
             width=15,
             command=self.update_plot)
-        self.show_button.pack()
+        show_button.pack()
 
         # Scale definitions
-        self.omega_scale = Scale(
+        omega_scale = Scale(
             right_frame,
             from_=1,
             to=10000,
@@ -67,8 +67,8 @@ class DiscrVisual(Frame):
             label="Omega",
             variable=self.OMEGA,
             resolution=10)
-        self.omega_scale.pack()
-        self.delta_scale = Scale(
+        omega_scale.pack()
+        delta_scale = Scale(
             right_frame,
             from_=1,
             to=300,
@@ -76,8 +76,8 @@ class DiscrVisual(Frame):
             label="Delta",
             variable=self.DELTA,
             resolution=1)
-        self.delta_scale.pack()
-        self.gamma_scale = Scale(
+        delta_scale.pack()
+        gamma_scale = Scale(
             right_frame,
             from_=1,
             to=300,
@@ -85,8 +85,8 @@ class DiscrVisual(Frame):
             label="Gamma",
             variable=self.GAMMA,
             resolution=1)
-        self.gamma_scale.pack()
-        self.epsilon_scale = Scale(
+        gamma_scale.pack()
+        epsilon_scale = Scale(
             right_frame,
             from_=0,
             to=1,
@@ -94,8 +94,8 @@ class DiscrVisual(Frame):
             label="Epsilon",
             variable=self.EPSILON,
             resolution=0.02)
-        self.epsilon_scale.pack()
-        self.mu_scale = Scale(
+        epsilon_scale.pack()
+        mu_scale = Scale(
             right_frame,
             from_=0,
             to=10,
@@ -103,14 +103,14 @@ class DiscrVisual(Frame):
             label="µ",
             variable=self.µ,
             resolution=0.1)
-        self.mu_scale.pack()
+        mu_scale.pack()
 
         # Check boxes
-        self.original_checkbutton = Checkbutton(
+        original_checkbutton = Checkbutton(
             right_frame,
             text="Show originial points",
             variable=self.show_points)
-        self.original_checkbutton.pack()
+        original_checkbutton.pack()
 
         # Plot creation
         self.fig = plt.Figure(figsize=(5, 5), dpi=150)
@@ -122,18 +122,18 @@ class DiscrVisual(Frame):
         self.calculate_clustering(draw_colormap=True)  # Call for first time
 
         # Button
-        self.apply_button = Button(
+        apply_button = Button(
             right_frame,
             text='Apply',
             width=15,
             command=self.calculate_clustering)
-        self.apply_button.pack()
-        self.save_button = Button(
+        apply_button.pack()
+        save_button = Button(
             right_frame,
             text="Save figure to file",
             width=15,
             command=self.save_figure)
-        self.save_button.pack()
+        save_button.pack()
 
     def save_figure(self, path="discriminator.png"):
         self.fig.savefig(path)
@@ -143,7 +143,6 @@ class DiscrVisual(Frame):
 
     def calculate_clustering(self, draw_colormap=False):
         # Load values
-        data = self.DATA
         omega = self.OMEGA.get()
         gamma = self.GAMMA.get()
         delta = self.DELTA.get()
@@ -151,9 +150,11 @@ class DiscrVisual(Frame):
         mu = self.µ.get()
 
         # Clustering
-        self.c_online = WCDS(omega, delta, gamma, epsilon, len(data[0]), µ=mu)
+        self.c_online = WCDS(
+            omega, delta, gamma, epsilon, len(
+                self.DATA[0]), µ=mu)
         self.assigned_discriminators = []
-        for time_, observation in enumerate(data):
+        for time_, observation in enumerate(self.DATA):
             self.assigned_discriminators.append(
                 self.c_online.record(observation, time_))
         self.discriminators = list(self.c_online.discriminators.keys())
@@ -169,7 +170,6 @@ class DiscrVisual(Frame):
 
     def update_plot(self, draw_colormap=False):
         # Load values
-        data = self.DATA
         show_points = self.show_points.get()
         discr_id = int(self.discriminator_box.get())
 
@@ -192,14 +192,14 @@ class DiscrVisual(Frame):
                               c=[point[1] for point in points])
         if show_points:
             # Show original points and centroid
-            self.ax.scatter([data[i][0] for i in range(len(data)) if self.assigned_discriminators[i] == discr_id], [
-                            data[i][1] for i in range(len(data)) if self.assigned_discriminators[i] == discr_id], marker="o", s=2, color="blue")
+            self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], [
+                            self.DATA[i][1] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], marker="o", s=2, color="blue")
             self.ax.scatter(
                 self.c_online.centroid(
                     self.c_online.discriminators[discr_id])[0],
                 self.c_online.centroid(
                     self.c_online.discriminators[discr_id])[1],
-                marker="X",
+                marker="x",
                 s=2.5,
                 color="red")
         if draw_colormap:

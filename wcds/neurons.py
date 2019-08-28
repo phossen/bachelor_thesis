@@ -65,6 +65,12 @@ class Neuron(object):
         """
         raise NotImplementedError("This method is abstract. Override it.")
 
+    def merge(self, neuron):
+        """
+        Merges the given neuron's knowledge into this one.
+        """
+        raise NotImplementedError("This method is abstract. Override it.")
+
 
 class SetNeuron(Neuron):
     """
@@ -95,6 +101,9 @@ class SetNeuron(Neuron):
         len_intrsctn = float(len(self.locations & neuron.locations))
         len_union = float(len(self.locations | neuron.locations))
         return len_intrsctn / len_union
+
+    def merge(self, neuron):
+        self.locations = neuron.locations | self.locations
 
 
 class DictNeuron(Neuron):
@@ -136,10 +145,15 @@ class DictNeuron(Neuron):
         Considering a & b the intersection of the locations written in both
         neurons and a | b their union, this method returns (a & b)/(a | b).
         """
+        # TODO: Use weighting
         len_intrsctn = float(
             len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
+
+    def merge(self, neuron):
+        for address in neuron.keys():
+            self.locations[address] += neuron.locations[address]
 
     def count(self, address):
         """
@@ -187,3 +201,14 @@ class SWNeuron(Neuron):
             len(self.locations.keys() & neuron.locations.keys()))
         len_union = float(len(self.locations.keys() | neuron.locations.keys()))
         return len_intrsctn / len_union
+
+    def merge(self, neuron):
+        intersection = set(
+            self.locations.keys()) & set(
+            neuron.locations.keys())
+        self.locations = {**self.locations, **neuron.locations}
+        if len(
+                intersection) != 0:  # Need to differentiate regarding most recent timestamp
+            for address in intersection:
+                self.locations[address] = max(
+                    self.locations[address], neuron.locations[address])
