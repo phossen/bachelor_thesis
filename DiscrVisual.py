@@ -26,9 +26,10 @@ class DiscrVisual(Frame):
                 (0.6, 0.6)], cluster_std=0.05, shuffle=True, random_state=None)[0]
 
         # Parameters
-        self.OMEGA = IntVar(self.master, 2000)
+        self.OMEGA = IntVar(self.master, 3500)
         self.DELTA = IntVar(self.master, 50)
         self.GAMMA = IntVar(self.master, 50)
+        self.BETA = IntVar(self.master, 6)
         self.EPSILON = DoubleVar(self.master, 0.5)
         self.µ = DoubleVar(self.master, 0)
         self.show_points = IntVar(self.master, 0)
@@ -68,15 +69,6 @@ class DiscrVisual(Frame):
             variable=self.OMEGA,
             resolution=10)
         omega_scale.pack()
-        delta_scale = Scale(
-            right_frame,
-            from_=1,
-            to=300,
-            orient=HORIZONTAL,
-            label="Delta",
-            variable=self.DELTA,
-            resolution=1)
-        delta_scale.pack()
         gamma_scale = Scale(
             right_frame,
             from_=1,
@@ -86,6 +78,24 @@ class DiscrVisual(Frame):
             variable=self.GAMMA,
             resolution=1)
         gamma_scale.pack()
+        delta_scale = Scale(
+            right_frame,
+            from_=1,
+            to=300,
+            orient=HORIZONTAL,
+            label="Delta",
+            variable=self.DELTA,
+            resolution=1)
+        delta_scale.pack()
+        beta_scale = Scale(
+            right_frame,
+            from_=1,
+            to=100,
+            orient=HORIZONTAL,
+            label="Beta",
+            variable=self.BETA,
+            resolution=2)
+        beta_scale.pack()
         epsilon_scale = Scale(
             right_frame,
             from_=0,
@@ -113,8 +123,7 @@ class DiscrVisual(Frame):
         original_checkbutton.pack()
 
         # Plot creation
-        self.fig = plt.Figure(figsize=(5, 5), dpi=150)
-        self.ax = self.fig.add_subplot()
+        self.fig, self.ax = plt.subplots(figsize=(5, 5), dpi=150)
         self.ax.axis("scaled")
         self.canvas = FigureCanvasTkAgg(self.fig, master=left_frame)
         self.canvas.get_tk_widget().grid(row=0, column=1)
@@ -146,13 +155,14 @@ class DiscrVisual(Frame):
         omega = self.OMEGA.get()
         gamma = self.GAMMA.get()
         delta = self.DELTA.get()
+        beta = self.BETA.get()
         epsilon = self.EPSILON.get()
         mu = self.µ.get()
 
         # Clustering
         self.c_online = WCDS(
             omega, delta, gamma, epsilon, len(
-                self.DATA[0]), µ=mu)
+                self.DATA[0]), beta=beta, µ=mu)
         self.assigned_discriminators = []
         for time_, observation in enumerate(self.DATA):
             self.assigned_discriminators.append(
@@ -164,6 +174,7 @@ class DiscrVisual(Frame):
         # Adjusting sliders to real values of WCDS
         self.GAMMA.set(self.c_online.gamma)
         self.DELTA.set(self.c_online.delta)
+        self.BETA.set(self.c_online.beta)
 
         # Plot
         self.update_plot(draw_colormap)
@@ -183,25 +194,21 @@ class DiscrVisual(Frame):
             for j in np.arange(0, 1, step):
                 matching_rate = self.c_online.discriminators[discr_id].matching(
                     self.c_online.addressing((i, j)), self.µ.get())
-                c = colormap(matching_rate)
-                points.append(((i, j), c))
+                points.append(((i, j), matching_rate))
         img = self.ax.scatter([point[0][0] for point in points],
                               [point[0][1] for point in points],
                               marker="s",
-                              s=1.5,
-                              c=[point[1] for point in points])
+                              s=1.5, cmap=colormap, c=[point[1] for point in points])
         if show_points:
             # Show original points and centroid
             self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], [
                             self.DATA[i][1] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], marker="o", s=2, color="blue")
-            self.ax.scatter(
-                self.c_online.centroid(
-                    self.c_online.discriminators[discr_id])[0],
-                self.c_online.centroid(
-                    self.c_online.discriminators[discr_id])[1],
-                marker="x",
-                s=2.5,
-                color="red")
+            centroid = self.c_online.centroid(
+                self.c_online.discriminators[discr_id])
+            self.ax.scatter(centroid[0], centroid[1],
+                            marker="x",
+                            s=2.5,
+                            color="red")
         if draw_colormap:
             self.fig.colorbar(img)
         self.canvas.draw_idle()

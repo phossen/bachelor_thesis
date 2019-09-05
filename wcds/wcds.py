@@ -65,10 +65,10 @@ class WiSARD(object):
 class WCDS(WiSARD):
     """
     This class implements WCDS (WiSARD for Clustering
-    Data Streams) - but only the only step.
+    Data Streams) - but only the online step.
     """
 
-    def __init__(self, omega, delta, gamma, epsilon, dimension, µ=0,
+    def __init__(self, omega, delta, gamma, epsilon, dimension, beta=None, µ=0,
                  discriminator_factory=SWDiscriminator, mapping="random", seed=random.randint(0, sys.maxsize)):
         """
         Constructor for WCDS.
@@ -80,12 +80,21 @@ class WCDS(WiSARD):
             gamma : Encoding resolution for binarization
             epsilon : Threshold for creating a new discriminator
             dimension : Dimension of the incoming instances
+            beta : Length of the addresses, iff None is automatically assigned
             µ : Cardinality weight to tackle cluster imbalance
             discriminator_factory : Callable to create discriminators
             mapping : Maptype used in addressing, either "linear" or "random"
             seed : Used to make results replicable in random mapping
         """
-        self._adjust_parameters(gamma, dimension, delta)
+        if beta is None:
+            self._adjust_parameters(gamma, dimension, delta)
+        else:
+            self.beta = beta
+            self.delta = delta
+            self.gamma = gamma
+            if not (beta * delta / gamma * dimension).is_integer():
+                logging.CRITICAL(
+                    "Parameters result in a float oversampling factor. (Beta * Delta) / (Gamma * Dimension) should be an integer.")
         self.omega = omega
         self.epsilon = epsilon
         self.µ = µ
@@ -93,7 +102,7 @@ class WCDS(WiSARD):
         self.mapping = mapping
         self.seed = seed
         self.discriminator_factory = discriminator_factory
-        self.discriminators = {}
+        self.discriminators = OrderedDict()
         self.discriminator_id = 0  # Currently unassigned id
         self.LRU = OrderedDict()  # Least recently used
         logging.info(
@@ -113,10 +122,11 @@ class WCDS(WiSARD):
 
     def _adjust_parameters(self, gamma, dimension, delta):
         """
-        The parameters have to fulfill the property:
+        If no oversampling is used,
+        the parameters have to fulfill the property:
             gamma * dimension = delta * beta
         with everything being an integer.
-        This function ensures this.
+        This function ensures this contraint.
         """
         if delta == gamma:
             self.gamma = gamma
@@ -167,6 +177,7 @@ class WCDS(WiSARD):
                 k, j, a = current
                 del self.discriminators[k].neurons[j].locations[a]
                 del self.LRU[current]
+                self.discriminators[k].length = len(self.discriminators[k])
                 deleted_addr += 1
                 try:
                     current = next(lru_iter)
@@ -212,6 +223,10 @@ class WCDS(WiSARD):
         # Absorb the current observation
         self.discriminators[k].record(addressing, time)
         for i, address in enumerate(addressing):
+            try:
+                del self.LRU[(k, i, address)]
+            except BaseException:
+                pass
             self.LRU[(k, i, address)] = time
         logging.info(
             "Absorbed observation. Current number of discriminators: {}".format(len(self)))
@@ -259,44 +274,11 @@ class WCDS(WiSARD):
                 count += 1
         return count
 
-    def centroid(self, discr):
-        """
-        Approximates the centroid of a given discriminator.
-        To properly work, the discriminator should not have
-        been affected by a split beforehand.
-        """
-        # Step 1: Calculate the mapped matrix
-        mapped_matrix = []
-        for neuron in discr.neurons:
-            mean_address = tuple([0 for _ in range(self.beta)])
-            for loc in neuron.locations:
-                mean_address = tuple(map(operator.add, mean_address, loc))
-            if len(neuron.locations) > 0:
-                mean_address = tuple([x / len(neuron.locations)
-                                      for x in mean_address])
-            mapped_matrix.append(mean_address)
-        mapped_matrix = np.array(mapped_matrix).flatten()
-
-        # Step 2: Undo random mapping
-        mapping = list(range(len(mapped_matrix)))
-        random.seed(self.seed)
-        random.shuffle(mapping)
-        unmapped_matrix = np.zeros(len(mapped_matrix))
-        for i, j in enumerate(mapping):
-            unmapped_matrix[j] = mapped_matrix[i]
-        unmapped_matrix = unmapped_matrix.reshape((self.dimension, self.gamma))
-
-        # Step 3: Calculate centroid coordinates
-        coordinates = []
-        for i in range(len(unmapped_matrix)):
-            coordinates.append(float(sum(unmapped_matrix[i]) / self.gamma))
-        return coordinates
-
     def addressing(self, observation):
         """
         Calculate and return the
         addressing for a given observation.
-        Should be only used for numercal attributes.
+        Should be only used for numerical attributes.
         """
         binarization = np.array(
             [self._binarize(x_i, self.gamma) for x_i in observation])
@@ -308,13 +290,39 @@ class WCDS(WiSARD):
             return addressing
         elif self.mapping == "random":
             binarization = binarization.flatten()
+            mapping = list(range(self.beta * self.delta))
             random.seed(self.seed)
-            random.shuffle(binarization)
-            binarization = np.reshape(binarization, (self.delta, self.beta))
-            addressing = [tuple(b) for b in binarization]
+            random.shuffle(mapping)
+            addressing = np.empty(len(mapping))
+            for i, m in enumerate(mapping):
+                addressing[m] = binarization[i % len(binarization)]
+            addressing = np.reshape(addressing, (self.delta, self.beta))
+            addressing = [tuple(b) for b in addressing]
             return addressing
         else:
             raise KeyError("Mapping has an invalid value!")
+
+    def reverse_addressing(self, addressing):
+        """
+        Reverse the applied addressing
+        and return an observation.
+        """
+        # Undo random mapping
+        addressing = addressing.flatten()
+        mapping = list(range(len(addressing)))
+        random.seed(self.seed)
+        random.shuffle(mapping)
+        unmapped_matrix = np.empty(self.dimension * self.gamma)
+        for i, m in enumerate(mapping):
+            unmapped_matrix[i % (self.dimension * self.gamma)] = addressing[m]
+        unmapped_matrix = unmapped_matrix.reshape((self.dimension, self.gamma))
+
+        # Calculate observation
+        observation = []
+        for bin_ in unmapped_matrix:
+            observation.append(float(sum(bin_)) / self.gamma)
+
+        return observation
 
     def _bit_to_int(self, bits):
         """
@@ -343,6 +351,8 @@ class WCDS(WiSARD):
         Saves the current configuration into a JSON file.
         """
         confg = {}
+
+        # Parameters and meta information
         if self.omega == math.inf:
             confg["omega"] = str(self.omega)
         else:
@@ -357,6 +367,7 @@ class WCDS(WiSARD):
         confg["seed"] = self.seed
         confg["discriminator_id"] = self.discriminator_id
 
+        # Content of discriminators and their neurons
         discr = {}
         for d in self.discriminators.values():
             n_dict = {}
@@ -369,6 +380,7 @@ class WCDS(WiSARD):
             discr[d.id_] = n_dict
         confg["discriminators"] = discr
 
+        # Save
         with open(path, "w") as write_file:
             json.dump(confg, write_file, indent=4)
         logging.info("Saved current configuration to {}".format(path))
@@ -377,8 +389,11 @@ class WCDS(WiSARD):
         """
         Loads the configuration stored in a JSON file.
         """
+        # Load
         with open(path, 'r') as read_file:
             confg = json.load(read_file)
+
+        # Parameters and meta information
         if isinstance(confg["omega"], str):
             self.omega = math.inf
         else:
@@ -394,8 +409,9 @@ class WCDS(WiSARD):
         self.discriminator_id = confg["discriminator_id"]
         self.discriminator_factory = SWDiscriminator
         self.LRU = OrderedDict()
-        unordererd_lru = dict()
+        unordererd_lru = []
 
+        # Content of discriminators and their neurons
         self.discriminators.clear()
         discr = confg["discriminators"]
         for key, d in zip(discr.keys(), discr.values()):
@@ -406,9 +422,61 @@ class WCDS(WiSARD):
                 for c in content:
                     address = tuple(c[0])
                     time_ = int(c[1])
-                    unordererd_lru[(key, j, address)]
+                    unordererd_lru.append(((key, j, address), time_))
                     n.locations[address] = time_
                 j += 1
             self.discriminators[key] = current_discr
 
+        # Sort LRU
+        unordererd_lru.sort(key=lambda x: x[1])
+        for value in unordererd_lru:
+            self.LRU[value[0]] = value[1]
+
         logging.info("Loaded configuration from {}".format(path))
+
+    def centroid(self, discr):
+        """
+        Approximates the centroid of a given discriminator.
+        To properly work, the discriminator should not have
+        been affected by a split beforehand.
+        """
+        # TODO: Make this a discriminator function
+        # Calculate the mapped matrix
+        mapped_matrix = []
+        for neuron in discr.neurons:
+            mean_address = tuple([0 for _ in range(self.beta)])
+            for loc in neuron.locations:
+                mean_address = tuple(map(operator.add, mean_address, loc))
+            if len(neuron.locations) > 0:
+                mean_address = tuple([x / len(neuron.locations)
+                                      for x in mean_address])
+            mapped_matrix.append(mean_address)
+        mapped_matrix = np.array(mapped_matrix)
+
+        # Calculate the coordinates
+        coordinates = self.reverse_addressing(mapped_matrix)
+
+        return coordinates
+
+    def drasiw(self, discr):
+        """
+        Returns a list of points representing the given discriminator.
+        """
+        # TODO: Make this a discriminator function
+        points = set()
+        max_len = max([len(neuron) for neuron in discr.neurons])
+
+        # Sampling points as often as maximum neuron length
+        for _ in range(max_len):
+            # Retreive random adresses
+            mapped_matrix = []
+            for i in range(len(discr.neurons)):
+                sample = list(
+                    random.choice(
+                        list(
+                            discr.neurons[i].locations.keys())))
+                mapped_matrix.extend(sample)
+            mapped_matrix = np.reshape(mapped_matrix, (self.delta, self.beta))
+            # Reverse addressing
+            points.add(tuple(self.reverse_addressing(mapped_matrix)))
+        return list(points)

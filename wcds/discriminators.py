@@ -180,6 +180,7 @@ class SWDiscriminator(Discriminator):
                  creation_time=None):
         super().__init__(no_neurons, id_, neuron_factory)
         self.creation_time = None
+        self.length = None  # Cache length
 
     def __len__(self):
         """
@@ -187,6 +188,7 @@ class SWDiscriminator(Discriminator):
         which is defined as the multiplication
         of the length of all its neurons.
         """
+        # TODO: Take care of overflow
         length = 1
         for neuron in self.neurons:
             length *= len(neuron)
@@ -197,6 +199,7 @@ class SWDiscriminator(Discriminator):
             self.creation_time = time_
         for address, neuron in zip(observation, self.neurons):
             neuron.record(address, time_)
+        self.length = self.__len__()  # Recalculate length
 
     def bleach(self, threshold):
         """
@@ -206,6 +209,8 @@ class SWDiscriminator(Discriminator):
         count = 0
         for neuron in self.neurons:
             count += neuron.bleach(threshold)
+        if count > 0:
+            self.length = self.__len__()  # Recalculate length
         return count
 
     def matching(self, observation, µ=0):
@@ -220,8 +225,10 @@ class SWDiscriminator(Discriminator):
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
                 match += 1
+        if µ == 0:
+            return (1. / self.no_neurons) * match
         return ((1. / self.no_neurons) * match) / \
-            ((len(self)) ** (float(µ) / self.no_neurons))
+            (self.length ** (float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
@@ -259,36 +266,4 @@ class SWDiscriminator(Discriminator):
         """
         for i in range(len(self.neurons)):
             self.neurons[i].merge(dscrmntr.neurons[i])
-
-    def drasiw(self, seed, dimension, gamma):
-        """
-        Returns a list of points representing this discriminator.
-        """
-        points = set()
-        max_len = max([len(neuron) for neuron in self.neurons])
-
-        # Sampling points as often as maximum neuron length
-        for _ in range(max_len):
-            # Retreive random adresses
-            mapped_matrix = []
-            for i in range(len(self.neurons)):
-                sample = list(
-                    random.choice(
-                        list(
-                            self.neurons[i].locations.keys())))
-                mapped_matrix.extend(sample)
-            # Calculate mapping
-            mapping = list(range(len(mapped_matrix)))
-            random.seed(seed)
-            random.shuffle(mapping)
-            unmapped_matrix = np.zeros(len(mapped_matrix))
-            # Apply mapping in reverse
-            for i, j in enumerate(mapping):
-                unmapped_matrix[j] = mapped_matrix[i]
-            unmapped_matrix = unmapped_matrix.reshape((dimension, gamma))
-            point = []
-            # Calculate coordinates
-            for i in range(len(unmapped_matrix)):
-                point.append(float(sum(unmapped_matrix[i]) / gamma))
-            points.add(tuple(point))
-        return list(points)
+        self.length = self.__len__()
