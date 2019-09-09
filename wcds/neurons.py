@@ -173,6 +173,10 @@ class SWNeuron(Neuron):
         self.locations = cl.OrderedDict()
 
     def record(self, address, time):
+        try:
+            del self.locations[address]
+        except KeyError:
+            pass
         self.locations[address] = time
 
     def bleach(self, threshold):

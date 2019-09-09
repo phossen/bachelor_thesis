@@ -10,6 +10,7 @@ import logging
 from collections import OrderedDict
 
 
+# Adjust to DEBUG to get more insight
 logging.basicConfig(
     filename="wcds.log",
     filemode="w",
@@ -92,8 +93,10 @@ class WCDS(WiSARD):
             self.beta = beta
             self.delta = delta
             self.gamma = gamma
-            if not (beta * delta / gamma * dimension).is_integer():
-                logging.CRITICAL(
+            if ((beta * delta) / (gamma * dimension)) < 1:
+                self._adjust_parameters(gamma, dimension, delta)
+            elif not ((beta * delta) / (gamma * dimension)).is_integer():
+                logging.critical(
                     "Parameters result in a float oversampling factor. (Beta * Delta) / (Gamma * Dimension) should be an integer.")
         self.omega = omega
         self.epsilon = epsilon
@@ -177,7 +180,6 @@ class WCDS(WiSARD):
                 k, j, a = current
                 del self.discriminators[k].neurons[j].locations[a]
                 del self.LRU[current]
-                self.discriminators[k].length = len(self.discriminators[k])
                 deleted_addr += 1
                 try:
                     current = next(lru_iter)
@@ -187,7 +189,9 @@ class WCDS(WiSARD):
 
         # Delete useless discriminators
         deleted_discr = self.clean_discriminators()
-        logging.info("Deleted {} empty discriminators.".format(deleted_discr))
+        logging.info(
+            "Deleted {} empty discriminators.".format(
+                len(deleted_discr)))
 
         # Calculate addressing of the observation
         addressing = self.addressing(observation)
@@ -225,13 +229,13 @@ class WCDS(WiSARD):
         for i, address in enumerate(addressing):
             try:
                 del self.LRU[(k, i, address)]
-            except BaseException:
+            except KeyError:
                 pass
             self.LRU[(k, i, address)] = time
         logging.info(
             "Absorbed observation. Current number of discriminators: {}".format(len(self)))
 
-        return k
+        return k, deleted_discr
 
     def predict(self, addressing):
         """
@@ -245,7 +249,10 @@ class WCDS(WiSARD):
             return predictions[0]
         predictions.sort(key=lambda x: x[1])
         k, best_matching = predictions[-1]
-        confidence = predictions[-1][1] - predictions[-2][1]
+        confidence = 0
+        if predictions[-1][1]:
+            confidence = (predictions[-1][1] -
+                          predictions[-2][1]) / predictions[-1][1]
         logging.info(
             "Predictions has a confidence of {}%".format(
                 confidence * 100))
@@ -265,14 +272,14 @@ class WCDS(WiSARD):
     def clean_discriminators(self):
         """
         Delete all discriminators which have empty neurons only.
-        Returns the number of deleted discriminators.
+        Returns the id list of deleted discriminators.
         """
-        count = 0
+        deleted = []
         for k in list(self.discriminators.keys()):
             if not self.discriminators[k].is_useful():
                 del self.discriminators[k]
-                count += 1
-        return count
+                deleted.append(k)
+        return deleted
 
     def addressing(self, observation):
         """
@@ -285,8 +292,11 @@ class WCDS(WiSARD):
 
         if self.mapping == "linear":
             binarization = binarization.flatten()
-            binarization = np.reshape(binarization, (self.delta, self.beta))
-            addressing = [tuple(b) for b in binarization]
+            addressing = []
+            for i in range(self.beta * self.delta):
+                addressing.append(binarization[i % len(binarization)])
+            addressing = np.reshape(addressing, (self.delta, self.beta))
+            addressing = [tuple(b) for b in addressing]
             return addressing
         elif self.mapping == "random":
             binarization = binarization.flatten()
@@ -307,22 +317,42 @@ class WCDS(WiSARD):
         Reverse the applied addressing
         and return an observation.
         """
-        # Undo random mapping
-        addressing = addressing.flatten()
-        mapping = list(range(len(addressing)))
-        random.seed(self.seed)
-        random.shuffle(mapping)
-        unmapped_matrix = np.empty(self.dimension * self.gamma)
-        for i, m in enumerate(mapping):
-            unmapped_matrix[i % (self.dimension * self.gamma)] = addressing[m]
-        unmapped_matrix = unmapped_matrix.reshape((self.dimension, self.gamma))
+        if self.mapping == "linear":
+            # Undo mapping
+            addressing = addressing.flatten()
+            unmapped_matrix = []
+            for i in range(self.dimension * self.gamma):
+                unmapped_matrix.append(addressing[i])
+            unmapped_matrix = np.array(unmapped_matrix).reshape(
+                (self.dimension, self.gamma))
 
-        # Calculate observation
-        observation = []
-        for bin_ in unmapped_matrix:
-            observation.append(float(sum(bin_)) / self.gamma)
+            # Calculate observation
+            observation = []
+            for bin_ in unmapped_matrix:
+                observation.append(float(sum(bin_)) / self.gamma)
 
-        return observation
+            return observation
+        elif self.mapping == "random":
+            # Undo random mapping
+            addressing = addressing.flatten()
+            mapping = list(range(len(addressing)))
+            random.seed(self.seed)
+            random.shuffle(mapping)
+            unmapped_matrix = np.empty(self.dimension * self.gamma)
+            for i, m in enumerate(mapping):
+                unmapped_matrix[i %
+                                (self.dimension * self.gamma)] = addressing[m]
+            unmapped_matrix = unmapped_matrix.reshape(
+                (self.dimension, self.gamma))
+
+            # Calculate observation
+            observation = []
+            for bin_ in unmapped_matrix:
+                observation.append(float(sum(bin_)) / self.gamma)
+
+            return observation
+        else:
+            raise KeyError("Mapping has an invalid value!")
 
     def _bit_to_int(self, bits):
         """
@@ -431,7 +461,6 @@ class WCDS(WiSARD):
         unordererd_lru.sort(key=lambda x: x[1])
         for value in unordererd_lru:
             self.LRU[value[0]] = value[1]
-
         logging.info("Loaded configuration from {}".format(path))
 
     def centroid(self, discr):
@@ -458,16 +487,17 @@ class WCDS(WiSARD):
 
         return coordinates
 
-    def drasiw(self, discr):
+    def drasiw(self, discr, sampling=None):
         """
         Returns a list of points representing the given discriminator.
         """
         # TODO: Make this a discriminator function
         points = set()
-        max_len = max([len(neuron) for neuron in discr.neurons])
+        if not sampling:
+            sampling = max([len(neuron) for neuron in discr.neurons])
 
-        # Sampling points as often as maximum neuron length
-        for _ in range(max_len):
+        # Sampling points as often as maximum neuron length or sampling
+        for _ in range(sampling):
             # Retreive random adresses
             mapped_matrix = []
             for i in range(len(discr.neurons)):

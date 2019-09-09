@@ -180,7 +180,6 @@ class SWDiscriminator(Discriminator):
                  creation_time=None):
         super().__init__(no_neurons, id_, neuron_factory)
         self.creation_time = None
-        self.length = None  # Cache length
 
     def __len__(self):
         """
@@ -199,7 +198,6 @@ class SWDiscriminator(Discriminator):
             self.creation_time = time_
         for address, neuron in zip(observation, self.neurons):
             neuron.record(address, time_)
-        self.length = self.__len__()  # Recalculate length
 
     def bleach(self, threshold):
         """
@@ -209,8 +207,6 @@ class SWDiscriminator(Discriminator):
         count = 0
         for neuron in self.neurons:
             count += neuron.bleach(threshold)
-        if count > 0:
-            self.length = self.__len__()  # Recalculate length
         return count
 
     def matching(self, observation, µ=0):
@@ -225,20 +221,19 @@ class SWDiscriminator(Discriminator):
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
                 match += 1
-        if µ == 0:
+        if not µ:
             return (1. / self.no_neurons) * match
         return ((1. / self.no_neurons) * match) / \
-            (self.length ** (float(µ) / self.no_neurons))
+            (self.__len__() ** (float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
         Calculates the intersection level of this and
-        a given discriminator the way described in the
-        WCDS Paper.
+        a given discriminator.
         """
         return np.mean([na.intersection_level(nb)
                         for na, nb in zip(self.neurons, dscrmntr.neurons)])
-        # TODO: Compare to version of WCDS paper
+        # TODO: Compare to version of WCDS paper:
         #d_union = 0
         #d_intersection = 0
         # for i in range(self.no_neurons):
@@ -266,4 +261,3 @@ class SWDiscriminator(Discriminator):
         """
         for i in range(len(self.neurons)):
             self.neurons[i].merge(dscrmntr.neurons[i])
-        self.length = self.__len__()

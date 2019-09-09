@@ -130,7 +130,7 @@ class DiscrVisual(Frame):
         self.canvas.draw()
         self.calculate_clustering(draw_colormap=True)  # Call for first time
 
-        # Button
+        # Buttons
         apply_button = Button(
             right_frame,
             text='Apply',
@@ -177,16 +177,15 @@ class DiscrVisual(Frame):
         self.BETA.set(self.c_online.beta)
 
         # Plot
-        self.update_plot(draw_colormap)
+        self.update_plot(draw_colormap=draw_colormap)
 
-    def update_plot(self, draw_colormap=False):
+    def update_plot(self, step=0.01, draw_colormap=False):
         # Load values
         show_points = self.show_points.get()
         discr_id = int(self.discriminator_box.get())
 
         # Plotting
         self.ax.clear()
-        step = 0.01
         colormap = cm.get_cmap("viridis")  # Adjust for other colors
         points = []
 
@@ -201,8 +200,10 @@ class DiscrVisual(Frame):
                               s=1.5, cmap=colormap, c=[point[1] for point in points])
         if show_points:
             # Show original points and centroid
-            self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], [
-                            self.DATA[i][1] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id], marker="o", s=2, color="blue")
+            self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id],
+                            [self.DATA[i][1] for i in range(
+                                len(self.DATA)) if self.assigned_discriminators[i] == discr_id],
+                            marker="o", s=2, color="blue")
             centroid = self.c_online.centroid(
                 self.c_online.discriminators[discr_id])
             self.ax.scatter(centroid[0], centroid[1],
