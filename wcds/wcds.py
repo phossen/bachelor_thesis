@@ -171,7 +171,8 @@ class WCDS(WiSARD):
         """
         for i in observation:
             if round(i, 5) > 1 or i < 0:
-                raise ValueError("Feature of given instance {} is not in [0:1]!".format(observation))
+                raise ValueError(
+                    "Feature of given instance {} is not in [0:1]!".format(observation))
         logging.info(
             "Received: Observation: {} Time: {}".format(
                 observation, time))

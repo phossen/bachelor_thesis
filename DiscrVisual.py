@@ -26,7 +26,7 @@ class DiscrVisual(Frame):
         # Data set
         self.DATA = make_blobs(
             n_samples=30, n_features=2, centers=[
-                (0.5,0.5)], cluster_std=0.05, shuffle=True, random_state=self.random_state)[0]
+                (0.5, 0.5)], cluster_std=0.05, shuffle=True, random_state=self.random_state)[0]
 
         # Parameters
         self.OMEGA = IntVar(self.master, 3500)
@@ -196,7 +196,9 @@ class DiscrVisual(Frame):
 
         # Plotting
         self.ax.clear()
-        colormap = cm.get_cmap("viridis")  # Adjust for other colors https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+        # Adjust for other colors
+        # https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
+        colormap = cm.get_cmap("viridis")
         points = []
         mu = self.µ.get()
 
@@ -209,7 +211,7 @@ class DiscrVisual(Frame):
                               [point[0][1] for point in points],
                               marker="s",
                               s=1.7, cmap=colormap, c=[point[1] for point in points], vmin=0, vmax=1)
-         # Show original points
+        # Show original points
         if show_points:
             self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id],
                             [self.DATA[i][1] for i in range(

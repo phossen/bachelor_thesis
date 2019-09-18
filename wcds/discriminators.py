@@ -239,7 +239,8 @@ class SWDiscriminator(Discriminator):
 
         if µ == 0.0:
             return (1. / self.no_neurons) * match
-        return ((1. / self.no_neurons) * match) / (self.__len__() ** (float(µ) / self.no_neurons))
+        return ((1. / self.no_neurons) * match) / \
+            (self.__len__() ** (float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
