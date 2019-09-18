@@ -91,10 +91,16 @@ class HitDiscriminator(Discriminator):
         return sum([len(n) for n in self.neurons])
 
     def record(self, observation):
+        """
+        Record the provided observation.
+        """
         for address, neuron in zip(observation, self.neurons):
             neuron.record(address)
 
     def bleach(self):
+        """
+        Bleach the discriminator by bleaching each of its neurons.
+        """
         for neuron in self.neurons:
             neuron.bleach()
 
@@ -103,7 +109,7 @@ class HitDiscriminator(Discriminator):
         Returns how similar the observation is to the stored knowledge.
 
         The return value is the sum of the answers of each neuron to its
-        respective address. This value can be normalized by being divided
+        respective address. This value can be normalized through division
         by the number of neurons.
         """
         if relative:
@@ -121,6 +127,9 @@ class HitDiscriminator(Discriminator):
                         for na, nb in zip(self.neurons, dscrmntr.neurons)])
 
     def merge(self, dscrmntr):
+        """
+        Merges the given into this discriminator.
+        """
         for i in range(len(self.neurons)):
             self.neurons[i].merge(dscrmntr.neurons[i])
 
@@ -142,10 +151,16 @@ class FrequencyDiscriminator(Discriminator):
         return sum([len(n) for n in self.neurons])
 
     def record(self, observation):
+        """
+        Record the provided observation.
+        """
         for address, neuron in zip(observation, self.neurons):
             neuron.record(address)
 
     def bleach(self):
+        """
+        Bleach the discriminator by bleaching each of its neurons.
+        """
         for neuron in self.neurons:
             neuron.bleach()
 
@@ -194,6 +209,9 @@ class SWDiscriminator(Discriminator):
         return length
 
     def record(self, observation, time_):
+        """
+        Record the provided observation.
+        """
         if self.creation_time is None:
             self.creation_time = time_
         for address, neuron in zip(observation, self.neurons):
@@ -213,18 +231,15 @@ class SWDiscriminator(Discriminator):
         """
         Returns the matching score between this
         discriminator and a given observation.
-
-        The higher µ, the more precise discriminators
-        are used.
         """
         match = 0
         for address, neuron in zip(observation, self.neurons):
             if neuron.is_set(address):
                 match += 1
-        if not µ:
+
+        if µ == 0.0:
             return (1. / self.no_neurons) * match
-        return ((1. / self.no_neurons) * match) / \
-            (self.__len__() ** (float(µ) / self.no_neurons))
+        return ((1. / self.no_neurons) * match) / (self.__len__() ** (float(µ) / self.no_neurons))
 
     def intersection_level(self, dscrmntr):
         """
@@ -246,7 +261,7 @@ class SWDiscriminator(Discriminator):
     def is_useful(self):
         """
         Returns whether this discriminator is useful,
-        which is only the case if not all of its neurons
+        which is only the case, if not all of its neurons
         are empty.
         """
         for n in self.neurons:

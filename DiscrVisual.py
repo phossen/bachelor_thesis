@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from tkinter import *
 from tkinter import ttk
 import matplotlib
+import logging
 matplotlib.use('TkAgg')
 
 
@@ -19,20 +20,23 @@ class DiscrVisual(Frame):
     def __init__(self, master=None):
         Frame.__init__(self, master)
         self.discriminators = []
+        self.addressing_seed = 123123
+        self.random_state = 123123
 
         # Data set
         self.DATA = make_blobs(
             n_samples=30, n_features=2, centers=[
-                (0.6, 0.6)], cluster_std=0.05, shuffle=True, random_state=None)[0]
+                (0.5,0.5)], cluster_std=0.05, shuffle=True, random_state=self.random_state)[0]
 
         # Parameters
         self.OMEGA = IntVar(self.master, 3500)
         self.DELTA = IntVar(self.master, 50)
         self.GAMMA = IntVar(self.master, 50)
-        self.BETA = IntVar(self.master, 6)
+        self.BETA = IntVar(self.master, 2)
         self.EPSILON = DoubleVar(self.master, 0.5)
         self.µ = DoubleVar(self.master, 0)
         self.show_points = IntVar(self.master, 0)
+        self.show_centroids = IntVar(self.master, 0)
 
         self.create_widgets()
 
@@ -54,7 +58,7 @@ class DiscrVisual(Frame):
         self.discriminator_box.pack()
         show_button = Button(
             right_frame,
-            text='Show',
+            text='Update plot',
             width=15,
             command=self.update_plot)
         show_button.pack()
@@ -121,9 +125,14 @@ class DiscrVisual(Frame):
             text="Show originial points",
             variable=self.show_points)
         original_checkbutton.pack()
+        centroid_checkbutton = Checkbutton(
+            right_frame,
+            text="Show centroid",
+            variable=self.show_centroids)
+        centroid_checkbutton.pack()
 
         # Plot creation
-        self.fig, self.ax = plt.subplots(figsize=(5, 5), dpi=150)
+        self.fig, self.ax = plt.subplots(figsize=(5, 5), dpi=170)
         self.ax.axis("scaled")
         self.canvas = FigureCanvasTkAgg(self.fig, master=left_frame)
         self.canvas.get_tk_widget().grid(row=0, column=1)
@@ -162,11 +171,11 @@ class DiscrVisual(Frame):
         # Clustering
         self.c_online = WCDS(
             omega, delta, gamma, epsilon, len(
-                self.DATA[0]), beta=beta, µ=mu)
+                self.DATA[0]), beta=beta, µ=mu, seed=self.addressing_seed)
         self.assigned_discriminators = []
         for time_, observation in enumerate(self.DATA):
             self.assigned_discriminators.append(
-                self.c_online.record(observation, time_))
+                self.c_online.record(observation, time_)[0])
         self.discriminators = list(self.c_online.discriminators.keys())
         self.update_cbox()
         self.discriminator_box.set(self.discriminators[0])
@@ -181,37 +190,41 @@ class DiscrVisual(Frame):
 
     def update_plot(self, step=0.01, draw_colormap=False):
         # Load values
+        show_centroid = self.show_centroids.get()
         show_points = self.show_points.get()
         discr_id = int(self.discriminator_box.get())
 
         # Plotting
         self.ax.clear()
-        colormap = cm.get_cmap("viridis")  # Adjust for other colors
+        colormap = cm.get_cmap("viridis")  # Adjust for other colors https://matplotlib.org/3.1.0/tutorials/colors/colormaps.html
         points = []
+        mu = self.µ.get()
 
         for i in np.arange(0, 1, step):
             for j in np.arange(0, 1, step):
                 matching_rate = self.c_online.discriminators[discr_id].matching(
-                    self.c_online.addressing((i, j)), self.µ.get())
+                    self.c_online.addressing((i, j)), mu)
                 points.append(((i, j), matching_rate))
         img = self.ax.scatter([point[0][0] for point in points],
                               [point[0][1] for point in points],
                               marker="s",
-                              s=1.5, cmap=colormap, c=[point[1] for point in points])
+                              s=1.7, cmap=colormap, c=[point[1] for point in points], vmin=0, vmax=1)
+         # Show original points
         if show_points:
-            # Show original points and centroid
             self.ax.scatter([self.DATA[i][0] for i in range(len(self.DATA)) if self.assigned_discriminators[i] == discr_id],
                             [self.DATA[i][1] for i in range(
                                 len(self.DATA)) if self.assigned_discriminators[i] == discr_id],
-                            marker="o", s=2, color="blue")
+                            marker="o", s=2, color="red")
+        # Show centroids
+        if show_centroid:
             centroid = self.c_online.centroid(
                 self.c_online.discriminators[discr_id])
             self.ax.scatter(centroid[0], centroid[1],
-                            marker="x",
+                            marker="X",
                             s=2.5,
-                            color="red")
+                            color="orange")
         if draw_colormap:
-            self.fig.colorbar(img)
+            self.fig.colorbar(img, label="Matching")
         self.canvas.draw_idle()
 
 

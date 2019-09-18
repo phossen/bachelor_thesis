@@ -46,7 +46,7 @@ class Neuron(object):
 
     def remove(self, address):
         """
-        Deletes the given address out the RAM.
+        Deletes the given address out of the RAM.
         """
         try:
             del self.locations[address]
@@ -83,9 +83,15 @@ class SetNeuron(Neuron):
         self.locations = set()
 
     def record(self, address):
+        """
+        Records the given address.
+        """
         self.locations.add(address)
 
     def remove(self, address):
+        """
+        Deletes the given address out of the RAM.
+        """
         try:
             self.locations.remove(address)
         except BaseException:
@@ -103,6 +109,9 @@ class SetNeuron(Neuron):
         return len_intrsctn / len_union
 
     def merge(self, neuron):
+        """
+        Merges the given neuron's knowledge into this one.
+        """
         self.locations = neuron.locations | self.locations
 
 
@@ -117,6 +126,9 @@ class DictNeuron(Neuron):
         self.locations = cl.defaultdict(int)
 
     def record(self, address, intensity=1):
+        """
+        Records the given address.
+        """
         if address in self.locations:
             self.locations[address] += intensity
         else:
@@ -152,6 +164,9 @@ class DictNeuron(Neuron):
         return len_intrsctn / len_union
 
     def merge(self, neuron):
+        """
+        Merges the given neuron's knowledge into this one.
+        """
         for address in neuron.keys():
             self.locations[address] += neuron.locations[address]
 
@@ -173,6 +188,9 @@ class SWNeuron(Neuron):
         self.locations = cl.OrderedDict()
 
     def record(self, address, time):
+        """
+        Records the given address.
+        """
         try:
             del self.locations[address]
         except KeyError:
@@ -207,12 +225,15 @@ class SWNeuron(Neuron):
         return len_intrsctn / len_union
 
     def merge(self, neuron):
+        """
+        Merges the given neuron's knowledge into this one.
+        """
         intersection = set(
             self.locations.keys()) & set(
             neuron.locations.keys())
         self.locations = {**self.locations, **neuron.locations}
-        if len(
-                intersection) != 0:  # Need to differentiate regarding most recent timestamp
+        # Need to differentiate regarding most recent timestamp
+        if len(intersection) != 0:
             for address in intersection:
                 self.locations[address] = max(
                     self.locations[address], neuron.locations[address])

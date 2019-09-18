@@ -1,1 +1,1 @@
-# WCDS (WiSARD for Clustering Data Streams)
+# WiSARD for Clustering Data Streams (WCDS)

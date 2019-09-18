@@ -21,7 +21,7 @@ class Clusterer(object):
 
         Parameters:
         -----------
-            X : Dictionary of discriminators to be clusterd.
+            X : Dictionary of discriminators to be clustered.
             n_clusters : The number of clusters to find. It must be None if distance_threshold is not None.
             distance_threshold : The linkage distance threshold under which, clusters will not be merged. If not None, n_clusters must be None.
 
@@ -48,6 +48,19 @@ class MinDistanceClustering(Clusterer):
         self.distance_threshold = distance_threshold
 
     def fit(self, X):
+        """
+        Clusters based on the given dictionary of discriminators.
+
+        Parameters:
+        -----------
+            X : Dictionary of discriminators to be clustered.
+            n_clusters : The number of clusters to find. It must be None if distance_threshold is not None.
+            distance_threshold : The linkage distance threshold under which, clusters will not be merged. If not None, n_clusters must be None.
+
+        Returns:
+        --------
+            clusters : Dictionary of discriminator ids and their offline cluster.
+        """
         # Creating lists needed throughout the clustering process
         discr = list(X.values())
         ids = [[x] for x in X.keys()]
@@ -128,6 +141,19 @@ class MergeClustering(MinDistanceClustering):
         self.distance_threshold = distance_threshold
 
     def fit(self, X):
+        """
+        Clusters based on the given dictionary of discriminators.
+
+        Parameters:
+        -----------
+            X : Dictionary of discriminators to be clustered.
+            n_clusters : The number of clusters to find. It must be None if distance_threshold is not None.
+            distance_threshold : The linkage distance threshold under which, clusters will not be merged. If not None, n_clusters must be None.
+
+        Returns:
+        --------
+            clusters : Dictionary of discriminator ids and their offline cluster.
+        """
         # Creating lists needed throughout the clustering process
         discr = list(X.values())
         ids = [[x] for x in X.keys()]
@@ -212,6 +238,20 @@ class CentroidClustering(Clusterer):
         self.distance_threshold = distance_threshold
 
     def fit(self, X, centroids, linkage="ward"):
+        """
+        Clusters based on the given dictionary of discriminators.
+
+        Parameters:
+        -----------
+            X : Dictionary of discriminators to be clustered.
+            n_clusters : The number of clusters to find. It must be None if distance_threshold is not None.
+            distance_threshold : The linkage distance threshold under which, clusters will not be merged. If not None, n_clusters must be None.
+
+        Returns:
+        --------
+            clusters : Dictionary of discriminator ids and their offline cluster.
+        """
+        # Cluster using Agglomerative Clustering
         clusterer = AgglomerativeClustering(
             n_clusters=self.n_clusters,
             distance_threshold=self.distance_threshold,

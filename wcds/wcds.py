@@ -10,7 +10,7 @@ import logging
 from collections import OrderedDict
 
 
-# Adjust to DEBUG to get more insight
+# Adjust level to DEBUG to get more information
 logging.basicConfig(
     filename="wcds.log",
     filemode="w",
@@ -98,6 +98,7 @@ class WCDS(WiSARD):
             elif not ((beta * delta) / (gamma * dimension)).is_integer():
                 logging.critical(
                     "Parameters result in a float oversampling factor. (Beta * Delta) / (Gamma * Dimension) should be an integer.")
+                self._adjust_parameters(gamma, dimension, delta)
         self.omega = omega
         self.epsilon = epsilon
         self.µ = µ
@@ -121,6 +122,9 @@ class WCDS(WiSARD):
                 self.mapping))
 
     def __len__(self):
+        """
+        Returns the number of discriminators.
+        """
         return len(self.discriminators)
 
     def _adjust_parameters(self, gamma, dimension, delta):
@@ -162,8 +166,12 @@ class WCDS(WiSARD):
         """
         Absorbs observation and timestamp.
         Returns the id of the discriminator
-        that absorbed the observation.
+        that absorbed the observation and a
+        id list of deleted discriminators.
         """
+        for i in observation:
+            if round(i, 5) > 1 or i < 0:
+                raise ValueError("Feature of given instance {} is not in [0:1]!".format(observation))
         logging.info(
             "Received: Observation: {} Time: {}".format(
                 observation, time))
@@ -227,6 +235,7 @@ class WCDS(WiSARD):
         # Absorb the current observation
         self.discriminators[k].record(addressing, time)
         for i, address in enumerate(addressing):
+            # Delete to keep dict ordered by time
             try:
                 del self.LRU[(k, i, address)]
             except KeyError:
@@ -254,7 +263,7 @@ class WCDS(WiSARD):
             confidence = (predictions[-1][1] -
                           predictions[-2][1]) / predictions[-1][1]
         logging.info(
-            "Predictions has a confidence of {}%".format(
+            "Prediction has a confidence of {}%".format(
                 confidence * 100))
         return k, best_matching
 
@@ -310,7 +319,7 @@ class WCDS(WiSARD):
             addressing = [tuple(b) for b in addressing]
             return addressing
         else:
-            raise KeyError("Mapping has an invalid value!")
+            raise ValueError("Mapping has an invalid value!")
 
     def reverse_addressing(self, addressing):
         """
@@ -352,12 +361,12 @@ class WCDS(WiSARD):
 
             return observation
         else:
-            raise KeyError("Mapping has an invalid value!")
+            raise ValueError("Mapping has an invalid value!")
 
     def _bit_to_int(self, bits):
         """
         Returns integer for list of bits.
-        WARNING: Does not handle too large integers.
+        WARNING: Does not handle bit strings longer than 32 bits.
         """
         out = 0
         for bit in bits:
@@ -369,11 +378,14 @@ class WCDS(WiSARD):
         Binarize given x using thermometer encoding.
         """
         b = list()
-        b.extend([1 for _ in range(int(x * resolution))])
+        b.extend([1 for _ in range(int(round(x * resolution)))])
         b.extend([0 for _ in range(resolution - len(b))])
         return b
 
     def clear(self):
+        """
+        Clears the discriminators.
+        """
         self.discriminators.clear()
 
     def save(self, path="wcds.json"):
